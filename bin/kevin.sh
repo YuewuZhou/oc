@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kevin — gpt-5.4-mini via the openclaude OpenAI shim.
+# Kevin — OpenAI shim. Model is read from OPENAI_MODEL in .env (default: gpt-4o).
 #
 # Usage: echo "prompt" | bash /path/to/openclaude/bin/kevin.sh [--dangerously-skip-permissions]
 #

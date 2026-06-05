@@ -7,6 +7,10 @@ import {
   resolveProviderRequest,
   isLocalProviderUrl as isProviderLocalUrl,
 } from '../src/services/api/providerConfig.js'
+import {
+  DEFAULT_GEMINI_BASE_URL,
+  DEFAULT_GEMINI_MODEL,
+} from '../src/utils/providerProfile.js'
 
 type CheckResult = {
   ok: boolean
@@ -95,11 +99,10 @@ function isLocalBaseUrl(baseUrl: string): boolean {
   return isProviderLocalUrl(baseUrl)
 }
 
-const GEMINI_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai'
 
 function currentBaseUrl(): string {
   if (isTruthy(process.env.CLAUDE_CODE_USE_GEMINI)) {
-    return process.env.GEMINI_BASE_URL ?? GEMINI_DEFAULT_BASE_URL
+    return process.env.GEMINI_BASE_URL ?? DEFAULT_GEMINI_BASE_URL
   }
   return process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1'
 }
@@ -113,7 +116,7 @@ function checkGeminiEnv(): CheckResult[] {
   results.push(pass('Provider mode', 'Google Gemini provider enabled.'))
 
   if (!model) {
-    results.push(pass('GEMINI_MODEL', 'Not set. Default gemini-2.0-flash will be used.'))
+    results.push(pass('GEMINI_MODEL', `Not set. Default ${DEFAULT_GEMINI_MODEL} will be used.`))
   } else {
     results.push(pass('GEMINI_MODEL', model))
   }
@@ -363,8 +366,8 @@ function serializeSafeEnvSummary(): Record<string, string | boolean> {
   if (isTruthy(process.env.CLAUDE_CODE_USE_GEMINI)) {
     return {
       CLAUDE_CODE_USE_GEMINI: true,
-      GEMINI_MODEL: process.env.GEMINI_MODEL ?? '(unset, default: gemini-2.0-flash)',
-      GEMINI_BASE_URL: process.env.GEMINI_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta/openai',
+      GEMINI_MODEL: process.env.GEMINI_MODEL ?? `(unset, default: ${DEFAULT_GEMINI_MODEL})`,
+      GEMINI_BASE_URL: process.env.GEMINI_BASE_URL ?? DEFAULT_GEMINI_BASE_URL,
       GEMINI_API_KEY_SET: Boolean(process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY),
     }
   }
@@ -427,7 +430,7 @@ async function main(): Promise<void> {
   results.push(checkBunRuntime())
   results.push(checkBuildArtifacts())
   results.push(...checkOpenAIEnv())
-  results.push(...checkSearchBackend())
+  results.push(...await checkSearchBackend())
   results.push(await checkBaseUrlReachability())
   results.push(checkOllamaProcessorMode())
 
