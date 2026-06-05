@@ -529,6 +529,7 @@ export function stripSafeHeredocSubstitutions(command: string): string | null {
   const ranges: Array<{ start: number; end: number }> = []
   while ((match = heredocPattern.exec(command)) !== null) {
     if (match.index > 0 && command[match.index - 1] === '\\') continue
+  if (match.index > 0 && command[match.index - 1] === '$') continue
     const delimiter = match[2] || match[3]
     if (!delimiter) continue
     const isDash = match[1] === '-'

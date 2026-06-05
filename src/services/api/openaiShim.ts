@@ -164,7 +164,6 @@ function convertMessages(
           })
         }
 
-        // Emit remaining user content
         if (otherContent.length > 0) {
           result.push({
             role: 'user',
@@ -185,9 +184,10 @@ function convertMessages(
           (b: { type?: string }) => b.type !== 'tool_use' && b.type !== 'thinking',
         )
 
+        const convertedText = convertContentBlocks(textContent)
         const assistantMsg: OpenAIMessage = {
           role: 'assistant',
-          content: convertContentBlocks(textContent) as string,
+          content: convertedText,
         }
 
         if (toolUses.length > 0) {
@@ -415,6 +415,29 @@ async function* openaiStreamToAnthropic(
             index: contentBlockIndex,
             delta: { type: 'text_delta', text: delta.content },
           }
+        }
+
+        if (delta.annotations?.length && hasEmittedContentStart) {
+          const sources = delta.annotations
+            .map((annotation: { title?: string; url?: string }) => {
+              if (!annotation.title && !annotation.url) return ''
+              return `${annotation.title ?? annotation.url} - ${annotation.url ?? ''}`.replace(/ - $/, '')
+            })
+            .filter(Boolean)
+          if (sources.length > 0) {
+            yield {
+              type: 'content_block_delta',
+              index: contentBlockIndex,
+              delta: {
+                type: 'text_delta',
+                text: `\n\n[Sources: ${sources.join(', ')}]`,
+              },
+            }
+          }
+        }
+
+        if (delta.role === 'assistant' && !hasEmittedContentStart && !delta.tool_calls?.length) {
+          hasEmittedContentStart = true
         }
 
         // Tool calls
@@ -695,6 +718,23 @@ class OpenAIShimMessages {
           }
         }
       }
+    }
+
+    const searchModel = process.env.OPENAI_SEARCH_MODEL
+    // Only switch to the search model when this is the WebSearch tool's internal sub-call.
+    // That call passes the native BetaWebSearchTool schema (name: 'web_search', lowercase),
+    // whereas the main loop wraps it as 'WebSearch' (capital W). Switching on every request
+    // would drop all tools from the main loop and break coding/operations.
+    const hasNativeWebSearchSchema = Array.isArray(body.tools) &&
+      (body.tools as Array<{ function?: { name?: string } }>).some(t => t?.function?.name === 'web_search')
+    const useNativeSearch = hasNativeWebSearchSchema && !!searchModel && /search-preview/.test(searchModel)
+    if (useNativeSearch) {
+      if (searchModel) body.model = searchModel
+      // gpt-4o-search-preview doesn't support function calling — drop all tools
+      delete body.tools
+      delete body.tool_choice
+      // gpt-4o-search-preview caps completion tokens at 16384
+      if ((body.max_completion_tokens as number) > 16384) body.max_completion_tokens = 16384
     }
 
     const headers: Record<string, string> = {

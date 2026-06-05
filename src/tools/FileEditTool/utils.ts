@@ -279,18 +279,7 @@ export function getPatchForEdits({
     edits[0].old_string === '' &&
     edits[0].new_string === ''
   ) {
-    const patch = getPatchForDisplay({
-      filePath,
-      fileContents,
-      edits: [
-        {
-          old_string: fileContents,
-          new_string: updatedFile,
-          replace_all: false,
-        },
-      ],
-    })
-    return { patch, updatedFile: '' }
+    return { patch: [], updatedFile: '' }
   }
 
   // Apply each edit and check if it actually changes the file

@@ -104,9 +104,11 @@ function isPersistentRetryEnabled(): boolean {
 }
 
 function isTransientCapacityError(error: unknown): boolean {
-  return (
-    is529Error(error) || (error instanceof APIError && error.status === 429)
-  )
+  return is529Error(error) || isRateLimitError(error)
+}
+
+function isRateLimitError(error: unknown): boolean {
+  return error instanceof APIError && error.status === 429
 }
 
 function isStaleConnectionError(error: unknown): boolean {
@@ -267,8 +269,7 @@ export async function* withRetry<T>(
       if (
         wasFastModeActive &&
         !isPersistentRetryEnabled() &&
-        error instanceof APIError &&
-        (error.status === 429 || is529Error(error))
+        isRateLimitError(error)
       ) {
         // If the 429 is specifically because extra usage (overage) is not
         // available, permanently disable fast mode with a specific message.
@@ -426,6 +427,10 @@ export async function* withRetry<T>(
         }
       }
 
+      if (!(error instanceof APIError)) {
+        throw new CannotRetryError(error, retryContext)
+      }
+
       // For other errors, proceed with normal retry logic
       // Get retry-after header if available
       const retryAfter = getRetryAfter(error)
@@ -489,14 +494,12 @@ export async function* withRetry<T>(
         let remaining = delayMs
         while (remaining > 0) {
           if (options.signal?.aborted) throw new APIUserAbortError()
-          if (error instanceof APIError) {
-            yield createSystemAPIErrorMessage(
-              error,
-              remaining,
-              reportedAttempt,
-              maxRetries,
-            )
-          }
+          yield createSystemAPIErrorMessage(
+            error,
+            remaining,
+            reportedAttempt,
+            maxRetries,
+          )
           const chunk = Math.min(remaining, HEARTBEAT_INTERVAL_MS)
           await sleep(chunk, options.signal, { abortError })
           remaining -= chunk
@@ -533,8 +536,8 @@ export function getRetryDelay(
   maxDelayMs = 32000,
 ): number {
   if (retryAfterHeader) {
-    const seconds = parseInt(retryAfterHeader, 10)
-    if (!isNaN(seconds)) {
+    const seconds = Number(retryAfterHeader)
+    if (Number.isFinite(seconds) && seconds >= 0) {
       return seconds * 1000
     }
   }
@@ -615,6 +618,7 @@ export function is529Error(error: unknown): boolean {
   // Check for 529 status code or overloaded error in message
   return (
     error.status === 529 ||
+    error.status === 503 ||
     // See below: the SDK sometimes fails to properly pass the 529 status code during streaming
     (error.message?.includes('"type":"overloaded_error"') ?? false)
   )
@@ -731,6 +735,10 @@ function shouldRetry(error: APIError): boolean {
   // Note this is not a standard header.
   const shouldRetryHeader = error.headers?.get('x-should-retry')
 
+  if (error.status === 429) {
+    return false
+  }
+
   // If the server explicitly says whether or not to retry, obey.
   // For Max and Pro users, should-retry is true, but in several hours, so we shouldn't.
   // Enterprise users can retry because they typically use PAYG instead of rate limits.
@@ -803,8 +811,8 @@ const MIN_COOLDOWN_MS = 10 * 60 * 1000 // 10 minutes
 function getRetryAfterMs(error: APIError): number | null {
   const retryAfter = getRetryAfter(error)
   if (retryAfter) {
-    const seconds = parseInt(retryAfter, 10)
-    if (!isNaN(seconds)) {
+    const seconds = Number(retryAfter)
+    if (Number.isFinite(seconds) && seconds >= 0) {
       return seconds * 1000
     }
   }

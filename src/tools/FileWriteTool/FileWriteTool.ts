@@ -196,6 +196,14 @@ export const FileWriteTool = buildTool({
     }
 
     const readTimestamp = toolUseContext.readFileState.get(fullFilePath)
+    if (!readTimestamp) {
+      return {
+        result: false,
+        message:
+          'File has not been read yet. Read it first before writing to it.',
+        errorCode: 2,
+      }
+    }
     if (!readTimestamp || readTimestamp.isPartialView) {
       return {
         result: false,

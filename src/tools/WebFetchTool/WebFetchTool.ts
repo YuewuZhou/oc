@@ -191,7 +191,15 @@ ${DESCRIPTION}`
   async validateInput(input) {
     const { url } = input
     try {
-      new URL(url)
+      const parsedUrl = new URL(url)
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        return {
+          result: false,
+          message: `Error: Invalid URL "${url}". Only http and https URLs are supported.`,
+          meta: { reason: 'invalid_url' },
+          errorCode: 1,
+        }
+      }
     } catch {
       return {
         result: false,

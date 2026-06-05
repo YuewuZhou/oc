@@ -146,6 +146,11 @@ export function resolveAgentTools(
         permissionMode,
       })
 
+  const availableToolMap = new Map<string, Tool>()
+  for (const tool of filteredAvailableTools) {
+    availableToolMap.set(tool.name, tool)
+  }
+
   // Create a set of disallowed tool names for quick lookup
   const disallowedToolSet = new Set(
     disallowedTools?.map(toolSpec => {
@@ -158,6 +163,18 @@ export function resolveAgentTools(
   const allowedAvailableTools = filteredAvailableTools.filter(
     tool => !disallowedToolSet.has(tool.name),
   )
+
+  if (agentTools?.some(toolSpec => permissionRuleValueFromString(toolSpec).toolName === AGENT_TOOL_NAME)) {
+    const agentTool = allowedAvailableTools.find(tool => tool.name === AGENT_TOOL_NAME)
+    if (!agentTool) {
+      return {
+        hasWildcard: false,
+        validTools: [],
+        invalidTools: agentTools,
+        resolvedTools: [],
+      }
+    }
+  }
 
   // If tools is undefined or ['*'], allow all tools (after filtering disallowed)
   const hasWildcard =
@@ -172,10 +189,6 @@ export function resolveAgentTools(
     }
   }
 
-  const availableToolMap = new Map<string, Tool>()
-  for (const tool of allowedAvailableTools) {
-    availableToolMap.set(tool.name, tool)
-  }
 
   const validTools: string[] = []
   const invalidTools: string[] = []
@@ -191,7 +204,10 @@ export function resolveAgentTools(
     if (toolName === AGENT_TOOL_NAME) {
       if (ruleContent) {
         // Parse comma-separated agent types: "worker, researcher" → ["worker", "researcher"]
-        allowedAgentTypes = ruleContent.split(',').map(s => s.trim())
+        allowedAgentTypes = ruleContent
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
       }
       // For sub-agents, Agent is excluded by filterToolsForAgent — mark the spec
       // valid for allowedAgentTypes tracking but skip tool resolution.
@@ -535,6 +551,7 @@ export async function runAsyncAgentLifecycle({
 }): Promise<void> {
   let stopSummarization: (() => void) | undefined
   const agentMessages: MessageType[] = []
+  let worktreeResult: Awaited<ReturnType<typeof getWorktreeResult>> | undefined
   try {
     const tracker = createProgressTracker()
     const resolveActivity = createActivityDescriptionResolver(
@@ -619,7 +636,7 @@ export async function runAsyncAgentLifecycle({
       }
     }
 
-    const worktreeResult = await getWorktreeResult()
+    worktreeResult = await getWorktreeResult()
 
     enqueueAgentNotification({
       taskId,
@@ -654,7 +671,7 @@ export async function runAsyncAgentLifecycle({
         reason:
           'user_kill_async' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
-      const worktreeResult = await getWorktreeResult()
+      worktreeResult = await getWorktreeResult()
       const partialResult = extractPartialResult(agentMessages)
       enqueueAgentNotification({
         taskId,
@@ -669,7 +686,7 @@ export async function runAsyncAgentLifecycle({
     }
     const msg = errorMessage(error)
     failAsyncAgent(taskId, msg, rootSetAppState)
-    const worktreeResult = await getWorktreeResult()
+    worktreeResult = await getWorktreeResult()
     enqueueAgentNotification({
       taskId,
       description,
@@ -680,6 +697,7 @@ export async function runAsyncAgentLifecycle({
       ...worktreeResult,
     })
   } finally {
+    stopSummarization?.()
     clearInvokedSkillsForAgent(agentIdForCleanup)
     clearDumpState(agentIdForCleanup)
   }

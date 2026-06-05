@@ -17,6 +17,10 @@ import { asSystemPrompt } from '../../utils/systemPromptType.js'
 import { isPreapprovedHost } from './preapproved.js'
 import { makeSecondaryModelPrompt } from './prompt.js'
 
+const DEFAULT_FETCH_TIMEOUT_MS = 60_000
+const DEFAULT_DOMAIN_CHECK_TIMEOUT_MS = 10_000
+const DEFAULT_MAX_REDIRECTS = 10
+
 // Custom error classes for domain blocking
 class DomainBlockedError extends Error {
   constructor(domain: string) {
@@ -141,14 +145,16 @@ export function validateURL(url: string): boolean {
     return false
   }
 
-  let parsed
+  let parsed: URL
   try {
     parsed = new URL(url)
   } catch {
     return false
   }
 
-  // We don't need to check protocol here, as we'll upgrade http to https when making the request
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false
+  }
 
   // As long as we aren't supporting aiming to cookies or internal domains,
   // we should block URLs with usernames/passwords too, even though these
@@ -182,7 +188,7 @@ export async function checkDomainBlocklist(
   try {
     const response = await axios.get(
       `https://api.anthropic.com/api/web/domain_info?domain=${encodeURIComponent(domain)}`,
-      { timeout: DOMAIN_CHECK_TIMEOUT_MS },
+      { timeout: DEFAULT_DOMAIN_CHECK_TIMEOUT_MS },
     )
     if (response.status === 200) {
       if (response.data.can_fetch === true) {
@@ -264,14 +270,15 @@ export async function getWithPermittedRedirects(
   signal: AbortSignal,
   redirectChecker: (originalUrl: string, redirectUrl: string) => boolean,
   depth = 0,
+  timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
 ): Promise<AxiosResponse<ArrayBuffer> | RedirectInfo> {
-  if (depth > MAX_REDIRECTS) {
-    throw new Error(`Too many redirects (exceeded ${MAX_REDIRECTS})`)
+  if (depth > DEFAULT_MAX_REDIRECTS) {
+    throw new Error(`Too many redirects (exceeded ${DEFAULT_MAX_REDIRECTS})`)
   }
   try {
     return await axios.get(url, {
       signal,
-      timeout: FETCH_TIMEOUT_MS,
+      timeout: timeoutMs,
       maxRedirects: 0,
       responseType: 'arraybuffer',
       maxContentLength: MAX_HTTP_CONTENT_LENGTH,
@@ -301,6 +308,7 @@ export async function getWithPermittedRedirects(
           signal,
           redirectChecker,
           depth + 1,
+          timeoutMs,
         )
       } else {
         // Return redirect information to the caller
@@ -347,6 +355,7 @@ export type FetchedContent = {
 export async function getURLMarkdownContent(
   url: string,
   abortController: AbortController,
+  timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
 ): Promise<FetchedContent | RedirectInfo> {
   if (!validateURL(url)) {
     throw new Error('Invalid URL')
@@ -418,11 +427,17 @@ export async function getURLMarkdownContent(
     upgradedUrl,
     abortController.signal,
     isPermittedRedirect,
+    0,
+    timeoutMs,
   )
 
   // Check if we got a redirect response
   if (isRedirectInfo(response)) {
     return response
+  }
+
+  if (!response.data) {
+    throw new Error('Web fetch returned an empty response body')
   }
 
   const rawBuffer = Buffer.from(response.data)
@@ -456,6 +471,9 @@ export async function getURLMarkdownContent(
   if (contentType.includes('text/html')) {
     markdownContent = (await getTurndownService()).turndown(htmlContent)
     contentBytes = Buffer.byteLength(markdownContent)
+  } else if (contentType.startsWith('text/') || contentType.includes('json')) {
+    markdownContent = htmlContent
+    contentBytes = bytes
   } else {
     // It's not HTML - just use it raw. The decoded string's UTF-8 byte
     // length equals rawBuffer.length (modulo U+FFFD replacement on invalid

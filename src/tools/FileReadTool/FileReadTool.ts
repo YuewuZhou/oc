@@ -146,7 +146,7 @@ const THIN_SPACE = String.fromCharCode(8239)
  */
 function getAlternateScreenshotPath(filePath: string): string | undefined {
   const filename = path.basename(filePath)
-  const amPmPattern = /^(.+)([ \u202F])(AM|PM)(\.png)$/
+  const amPmPattern = /^(.+)([ \u202F])(AM|PM)(\.png)$/i
   const match = filename.match(amPmPattern)
   if (!match) return undefined
 

@@ -308,6 +308,17 @@ export const FileEditTool = buildTool({
           }
         }
       }
+    } else {
+      return {
+        result: false,
+        behavior: 'ask',
+        message:
+          'File has not been read yet. Read it first before writing to it.',
+        meta: {
+          isFilePathAbsolute: String(isAbsolute(file_path)),
+        },
+        errorCode: 6,
+      }
     }
 
     const file = fileContent

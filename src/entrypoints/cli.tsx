@@ -338,7 +338,16 @@ async function main(): Promise<void> {
 
   // Redirect common update flag mistakes to the update subcommand
   if (args.length === 1 && (args[0] === '--update' || args[0] === '--upgrade')) {
-    process.argv = [process.argv[0]!, process.argv[1]!, 'update'];
+    profileCheckpoint('cli_update_path');
+    const {
+      enableConfigs
+    } = await import('../utils/config.js');
+    enableConfigs();
+    const {
+      update
+    } = await import('../cli/update.js');
+    await update();
+    return;
   }
 
   // --bare: set SIMPLE early so gates fire during module eval / commander

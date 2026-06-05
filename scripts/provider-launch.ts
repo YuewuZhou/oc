@@ -109,7 +109,10 @@ function runProcess(command: string, args: string[], env: NodeJS.ProcessEnv): Pr
     })
 
     child.on('close', code => resolve(code ?? 1))
-    child.on('error', () => resolve(1))
+    child.on('error', error => {
+      console.error(`Failed to run ${command}: ${error instanceof Error ? error.message : String(error)}`)
+      resolve(1)
+    })
   })
 }
 
@@ -180,7 +183,12 @@ async function main(): Promise<void> {
     persisted,
     goal: options.goal,
     getOllamaChatBaseUrl,
-    resolveOllamaDefaultModel: async () => resolvedOllamaModel || 'llama3.1:8b',
+    resolveOllamaDefaultModel: async () => {
+      if (!resolvedOllamaModel) {
+        throw new Error('No viable Ollama chat model was discovered.')
+      }
+      return resolvedOllamaModel
+    },
   })
   if (options.fast) {
     applyFastFlags(env)

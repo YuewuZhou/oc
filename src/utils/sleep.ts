@@ -22,9 +22,9 @@ export function sleep(
     // `timer` while still in the Temporal Dead Zone.
     if (signal?.aborted) {
       if (opts?.throwOnAbort || opts?.abortError) {
-        void reject(opts.abortError?.() ?? new Error('aborted'))
+        reject(opts.abortError?.() ?? new Error('aborted'))
       } else {
-        void resolve()
+        resolve()
       }
       return
     }
@@ -41,9 +41,9 @@ export function sleep(
     function onAbort(): void {
       clearTimeout(timer)
       if (opts?.throwOnAbort || opts?.abortError) {
-        void reject(opts.abortError?.() ?? new Error('aborted'))
+        reject(opts.abortError?.() ?? new Error('aborted'))
       } else {
-        void resolve()
+        resolve()
       }
     }
     signal?.addEventListener('abort', onAbort, { once: true })

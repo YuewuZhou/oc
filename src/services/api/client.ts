@@ -133,7 +133,15 @@ export async function getAnthropicClient({
   }
 
   logForDebugging('[API:auth] OAuth token check starting')
-  await checkAndRefreshOAuthTokenIfNeeded()
+  await Promise.race([
+    checkAndRefreshOAuthTokenIfNeeded(),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('OAuth token refresh timed out after 30s')),
+        30_000,
+      ),
+    ),
+  ])
   logForDebugging('[API:auth] OAuth token check complete')
 
   if (!isClaudeAISubscriber()) {
@@ -145,7 +153,13 @@ export async function getAnthropicClient({
   const ARGS = {
     defaultHeaders,
     maxRetries,
-    timeout: parseInt(process.env.API_TIMEOUT_MS || String(600 * 1000), 10),
+    timeout: (() => {
+      const parsed = parseInt(
+        process.env.API_TIMEOUT_MS || String(600 * 1000),
+        10,
+      )
+      return Number.isNaN(parsed) || parsed <= 0 ? 600 * 1000 : parsed
+    })(),
     dangerouslyAllowBrowser: true,
     fetchOptions: getProxyFetchOptions({
       forAnthropicAPI: true,
@@ -159,7 +173,13 @@ export async function getAnthropicClient({
     return createOpenAIShimClient({
       defaultHeaders,
       maxRetries,
-      timeout: parseInt(process.env.API_TIMEOUT_MS || String(600 * 1000), 10),
+      timeout: (() => {
+        const parsed = parseInt(
+          process.env.API_TIMEOUT_MS || String(600 * 1000),
+          10,
+        )
+        return Number.isNaN(parsed) || parsed <= 0 ? 600 * 1000 : parsed
+      })(),
     }) as unknown as Anthropic
   }
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK)) {

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Thin wrapper so the tool is callable as `search "query"` without python3 prefix.
+# Requires OPENAI_API_KEY in environment.
+exec "$(dirname "$0")/venv/bin/python" "$(dirname "$0")/search.py" "$@"

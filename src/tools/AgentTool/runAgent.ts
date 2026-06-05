@@ -196,15 +196,15 @@ async function initializeAgentMcpServers(
   // Shared clients (referenced by string name) are memoized and used by the parent context
   const cleanup = async () => {
     for (const client of newlyCreatedClients) {
-      if (client.type === 'connected') {
-        try {
+      try {
+        if (client.type === 'connected') {
           await client.cleanup()
-        } catch (error) {
-          logForDebugging(
-            `[Agent: ${agentDefinition.agentType}] Error cleaning up MCP server '${client.name}': ${error}`,
-            { level: 'warn' },
-          )
         }
+      } catch (error) {
+        logForDebugging(
+          `[Agent: ${agentDefinition.agentType}] Error cleaning up MCP server '${client.name}': ${error}`,
+          { level: 'warn' },
+        )
       }
     }
   }

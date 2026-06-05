@@ -116,7 +116,11 @@ export async function resizeShellImageOutput(
   if (outputFilePath) {
     const size = outputFileSize ?? (await stat(outputFilePath)).size
     if (size > MAX_IMAGE_FILE_SIZE) return null
-    source = await readFile(outputFilePath, 'utf8')
+    try {
+      source = await readFile(outputFilePath, 'utf8')
+    } catch {
+      return null
+    }
   }
   const parsed = parseDataUri(source)
   if (!parsed) return null
@@ -182,7 +186,9 @@ export function resetCwdIfOutsideProject(
       !pathInAllowedWorkingPath(cwd, toolPermissionContext))
   ) {
     // Reset to original directory if maintaining project dir OR outside allowed working directory
-    setCwd(originalCwd)
+    if (cwd !== originalCwd) {
+      setCwd(originalCwd)
+    }
     if (!shouldMaintain) {
       logEvent('tengu_bash_tool_reset_to_original_dir', {})
       return true

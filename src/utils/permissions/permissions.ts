@@ -244,10 +244,10 @@ function toolMatchesRule(
     return false
   }
 
-  // MCP tools are matched by their fully qualified mcp__server__tool name. In
-  // skip-prefix mode (CLAUDE_AGENT_SDK_MCP_NO_PREFIX), MCP tools have unprefixed
-  // display names (e.g., "Write") that collide with builtin names; rules targeting
-  // builtins should not match their MCP replacements.
+  // MCP tools are matched by their fully qualified mcp__server__tool name.
+  // In skip-prefix mode (CLAUDE_AGENT_SDK_MCP_NO_PREFIX), MCP tools have
+  // unprefixed display names (e.g., "Write") that collide with builtin names;
+  // rules targeting builtins should not match their MCP replacements.
   const nameForRuleMatch = getToolNameForPermissionCheck(tool)
 
   // Direct tool name match
@@ -255,16 +255,25 @@ function toolMatchesRule(
     return true
   }
 
-  // MCP server-level permission: rule "mcp__server1" matches tool "mcp__server1__tool1"
-  // Also supports wildcard: rule "mcp__server1__*" matches all tools from server1
   const ruleInfo = mcpInfoFromString(rule.ruleValue.toolName)
   const toolInfo = mcpInfoFromString(nameForRuleMatch)
 
+  if (ruleInfo === null || toolInfo === null) {
+    return false
+  }
+
+  // Server-level rule "mcp__server1" matches all tools from that server.
+  if (
+    ruleInfo.toolName === undefined ||
+    ruleInfo.toolName === '*'
+  ) {
+    return ruleInfo.serverName === toolInfo.serverName
+  }
+
+  // Fully qualified rule "mcp__server1__tool1" requires exact tool match.
   return (
-    ruleInfo !== null &&
-    toolInfo !== null &&
-    (ruleInfo.toolName === undefined || ruleInfo.toolName === '*') &&
-    ruleInfo.serverName === toolInfo.serverName
+    ruleInfo.serverName === toolInfo.serverName &&
+    ruleInfo.toolName === toolInfo.toolName
   )
 }
 

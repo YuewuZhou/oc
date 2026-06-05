@@ -66,6 +66,14 @@ export function extractConnectionErrorDetails(
       }
     }
 
+    if (current instanceof Error && current.name === 'AbortError') {
+      return {
+        code: 'ABORT_ERR',
+        message: current.message,
+        isSSLError: false,
+      }
+    }
+
     // Move to the next cause in the chain
     if (
       current instanceof Error &&
@@ -240,6 +248,10 @@ export function formatAPIError(error: APIError): string {
       return `Unable to connect to API (${connectionDetails.code})`
     }
     return 'Unable to connect to API. Check your internet connection'
+  }
+
+  if (connectionDetails?.code === 'ABORT_ERR') {
+    return 'Request aborted.'
   }
 
   // Guard: when deserialized from JSONL (e.g. --resume), the error object may

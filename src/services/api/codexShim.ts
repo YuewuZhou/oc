@@ -130,7 +130,7 @@ function convertSystemPrompt(system: unknown): string {
 
 function convertToolResultToText(content: unknown): string {
   if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return JSON.stringify(content ?? '')
+  if (!Array.isArray(content)) return String(content ?? '')
 
   const chunks: string[] = []
   for (const block of content) {
@@ -644,7 +644,7 @@ export async function collectCodexCompletedResponse(
       event.event === 'response.completed' ||
       event.event === 'response.incomplete'
     ) {
-      completedResponse = event.data?.response
+      completedResponse = event.data?.response ?? event.data
       break
     }
   }
@@ -801,7 +801,7 @@ export async function* codexStreamToAnthropic(
       event.event === 'response.completed' ||
       event.event === 'response.incomplete'
     ) {
-      finalResponse = payload.response
+      finalResponse = payload.response ?? payload
       break
     }
 

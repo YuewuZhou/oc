@@ -204,6 +204,61 @@ export OPENAI_MODEL=gpt-4o
 
 ---
 
+## SubAgents (Kevins)
+
+OpenClaude has a built-in `SubAgent` tool that lets the model delegate focused tasks to a child openclaude process. These subagents are nicknamed **Kevins** — isolated, self-contained workers that run in parallel and report results back to the parent.
+
+### How it works
+
+When the model calls `SubAgent`, OpenClaude spawns a new `node dist/cli.mjs -p` process and pipes the prompt to it via stdin. The child runs independently with no access to the parent's conversation history, completes its task, and returns the output as a tool result.
+
+### Using Kevins from the shell
+
+Run a single one-shot task:
+
+```bash
+echo "your prompt here" | node dist/cli.mjs -p
+```
+
+Run a kevin that can read and write files (required for code fixes):
+
+```bash
+echo "your prompt here" | node dist/cli.mjs -p --dangerously-skip-permissions
+```
+
+Run several kevins in parallel:
+
+```bash
+echo "task one" | node dist/cli.mjs -p --dangerously-skip-permissions &
+echo "task two" | node dist/cli.mjs -p --dangerously-skip-permissions &
+wait
+```
+
+### Writing good kevin prompts
+
+Since kevins have no shared context, every prompt must be self-contained:
+
+- State the working directory explicitly: `Your working directory is /path/to/repo.`
+- Include the file path(s) to read or edit.
+- Describe the exact change needed — don't rely on prior conversation.
+- Tell the kevin to verify its work (e.g. `run bun run build to confirm it compiles`).
+
+### Limitations
+
+| Constraint | Detail |
+|---|---|
+| No shared context | Each kevin starts fresh with no conversation history |
+| File writes need `--dangerously-skip-permissions` | Without it, the kevin will ask for permission and block |
+| 5-minute timeout | Kevins are killed after 5 minutes (SIGTERM → SIGKILL after 5s) |
+| Same provider | Kevins inherit `process.env`, so they use the same model/API key as the parent |
+
+### Source
+
+Tool implementation: `src/tools/OpenClaudeTool/OpenClaudeTool.ts`
+Registered in: `src/tools.ts` → `getAllBaseTools()`
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -215,9 +270,40 @@ export OPENAI_MODEL=gpt-4o
 | `CODEX_API_KEY` | Codex only | Codex/ChatGPT access token override |
 | `CODEX_AUTH_JSON_PATH` | Codex only | Path to a Codex CLI `auth.json` file |
 | `CODEX_HOME` | Codex only | Alternative Codex home directory (`auth.json` will be read from here) |
+| `SEARXNG_URL` | No | SearXNG endpoint for local web search (e.g. `http://localhost:8080`) |
+| `BRAVE_SEARCH_API_KEY` | No | Brave Search API key for web search |
+| `OPENAI_SEARCH_MODEL` | No | OpenAI search-capable model to use for native web search (e.g. `gpt-4o-search-preview`). Keeps `OPENAI_MODEL` as your main model. |
 | `OPENCLAUDE_DISABLE_CO_AUTHORED_BY` | No | Set to `1` to suppress the default `Co-Authored-By` trailer in generated git commit messages |
 
 You can also use `ANTHROPIC_MODEL` to override the model name. `OPENAI_MODEL` takes priority.
+
+## Web Search
+
+### Option A: SearXNG (local, free, recommended)
+```bash
+docker compose -f docker-compose.searxng.yml up -d
+export SEARXNG_URL=http://localhost:8080
+```
+
+### Option B: Brave Search API
+```bash
+# Get a free key at https://api.search.brave.com/
+export BRAVE_SEARCH_API_KEY=your-key-here
+```
+
+### Option C: DuckDuckGo (automatic fallback)
+No setup needed. When CLAUDE_CODE_USE_OPENAI=1, the WebSearch tool uses DuckDuckGo automatically.
+
+### Option D: OpenAI native search
+Use a separate search model so your main model stays on a cheaper/faster option:
+```bash
+export OPENAI_MODEL=gpt-5.4-mini        # main model for regular work
+export OPENAI_SEARCH_MODEL=gpt-4o-search-preview  # only used for web search turns
+```
+Or, if you want one model to handle everything:
+```bash
+export OPENAI_MODEL=gpt-4o-search-preview
+```
 
 OpenClaude PR bodies use OpenClaude branding by default. `OPENCLAUDE_DISABLE_CO_AUTHORED_BY` only affects the commit trailer, not PR attribution text.
 

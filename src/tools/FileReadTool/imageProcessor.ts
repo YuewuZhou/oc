@@ -33,6 +33,7 @@ type SharpCreator = (options: SharpCreatorOptions) => SharpInstance
 
 let imageProcessorModule: { default: SharpFunction } | null = null
 let imageCreatorModule: { default: SharpCreator } | null = null
+let fallbackWarningShown = false
 
 export async function getImageProcessor(): Promise<SharpFunction> {
   if (imageProcessorModule) {
@@ -49,10 +50,13 @@ export async function getImageProcessor(): Promise<SharpFunction> {
       return sharp
     } catch {
       // Fall back to sharp if native module is not available
-      // biome-ignore lint/suspicious/noConsole: intentional warning
-      console.warn(
-        'Native image processor not available, falling back to sharp',
-      )
+      if (!fallbackWarningShown) {
+        fallbackWarningShown = true
+        // biome-ignore lint/suspicious/noConsole: intentional warning
+        console.warn(
+          'Native image processor not available, falling back to sharp',
+        )
+      }
     }
   }
 

@@ -30,13 +30,13 @@ import { posixPathToWindowsPath } from './windowsPaths.js'
  * expandPath('/absolute/path') // '/absolute/path'
  */
 export function expandPath(path: string, baseDir?: string): string {
-  // Set default baseDir to getCwd() if not provided
-  const actualBaseDir = baseDir ?? getCwd() ?? getFsImplementation().cwd()
-
   // Input validation
   if (typeof path !== 'string') {
     throw new TypeError(`Path must be a string, received ${typeof path}`)
   }
+
+  // Set default baseDir to getCwd() if not provided
+  const actualBaseDir = baseDir ?? getCwd() ?? getFsImplementation().cwd()
 
   if (typeof actualBaseDir !== 'string') {
     throw new TypeError(

@@ -48,6 +48,7 @@ export type ShellCommand = {
 
 const SIGKILL = 137
 const SIGTERM = 143
+const EXIT_TIMEOUT = 124
 
 // Background tasks write stdout/stderr directly to a file fd (no JS involvement),
 // so a stuck append loop can fill the disk. Poll file size and kill when exceeded.
@@ -197,7 +198,7 @@ class ShellCommandImpl implements ShellCommand {
       code !== null && code !== undefined
         ? code
         : signal === 'SIGTERM'
-          ? 144
+          ? SIGTERM
           : 1
     this.#resolveExitCode(exitCode)
   }
@@ -337,7 +338,8 @@ class ShellCommandImpl implements ShellCommand {
   #doKill(code?: number): void {
     this.#status = 'killed'
     if (this.#childProcess.pid) {
-      treeKill(this.#childProcess.pid, 'SIGKILL')
+      const signal = process.platform === 'win32' ? 'SIGTERM' : 'SIGKILL'
+      treeKill(this.#childProcess.pid, signal)
     }
     this.#resolveExitCode(code ?? SIGKILL)
   }
@@ -417,7 +419,7 @@ class AbortedShellCommand implements ShellCommand {
   }) {
     this.taskOutput = new TaskOutput(generateTaskId('local_bash'), null)
     this.result = Promise.resolve({
-      code: opts?.code ?? 145,
+      code: opts?.code ?? EXIT_TIMEOUT,
       stdout: '',
       stderr: opts?.stderr ?? 'Command aborted before execution',
       interrupted: true,

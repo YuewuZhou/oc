@@ -192,7 +192,7 @@ export async function exec(
     shouldAutoBackground,
     onStdout,
   } = options ?? {}
-  const commandTimeout = timeout || DEFAULT_TIMEOUT
+  const commandTimeout = timeout ?? DEFAULT_TIMEOUT
 
   const provider = await resolveProvider[shellType]()
 

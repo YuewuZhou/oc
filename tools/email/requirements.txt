@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+aiosmtplib
+jinja2
+aiosmtpd
+httpx
+pytest
+pytest-asyncio
+pydantic
+aiosqlite
+python-dotenv
+pydantic-settings
+aioimaplib

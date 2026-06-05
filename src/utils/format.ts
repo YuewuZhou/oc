@@ -225,7 +225,7 @@ export function formatLogMetadata(log: {
   if (log.agentSetting) {
     parts.push(`@${log.agentSetting}`)
   }
-  if (log.prNumber) {
+  if (log.prNumber !== undefined) {
     parts.push(
       log.prRepository
         ? `${log.prRepository}#${log.prNumber}`
@@ -240,7 +240,7 @@ export function formatResetTime(
   showTimezone: boolean = false,
   showTime: boolean = true,
 ): string | undefined {
-  if (!timestampInSeconds) return undefined
+  if (timestampInSeconds === undefined) return undefined
 
   const date = new Date(timestampInSeconds * 1000)
   const now = new Date()

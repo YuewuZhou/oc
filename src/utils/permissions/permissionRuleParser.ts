@@ -121,9 +121,10 @@ export function permissionRuleValueFromString(
     return { toolName: normalizeLegacyToolName(ruleString) }
   }
 
-  // Empty content (e.g., "Bash()") or standalone wildcard (e.g., "Bash(*)")
-  // should be treated as just the tool name (tool-wide rule)
-  if (rawContent === '' || rawContent === '*') {
+  // Empty content (e.g., "Bash()") should be treated as just the tool name
+  // (tool-wide rule). A standalone wildcard content must remain content-specific
+  // so rules like "Bash(*)" only match explicit wildcard-aware consumers.
+  if (rawContent === '') {
     return { toolName: normalizeLegacyToolName(toolName) }
   }
 

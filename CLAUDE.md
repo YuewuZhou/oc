@@ -39,8 +39,100 @@ Provider launch helpers:
 - `src/commands/` contains the slash commands exposed to users and the model. Some commands are always available, while others are gated by feature flags, auth state, or remote-safety rules.
 - `src/skills/`, plugin loaders, and workflow loaders feed extra prompt commands into the same command pipeline as built-ins.
 
+## SubAgent tool ("Kevins")
+
+The `SubAgent` tool (`src/tools/OpenClaudeTool/OpenClaudeTool.ts`) lets the running model delegate self-contained tasks to a child openclaude process. The child is spawned via `node process.argv[1] -p` with the prompt piped to stdin.
+
+Key implementation details:
+- Tool name: `SubAgent`, registered in `getAllBaseTools()` in `src/tools.ts`
+- Input: `{ description: string, prompt: string }` — description is shown in UI, prompt goes to the child
+- The child inherits `process.env` and `process.cwd()` from the parent
+- A `settled` guard prevents double-resolution if abort/timeout races with `close`
+- SIGTERM is sent on timeout/abort, followed by SIGKILL after 5s if the child is still alive
+- Timeout: 5 minutes (`TIMEOUT_MS` constant at top of file)
+
+Running a kevin from the shell (for debugging):
+```bash
+echo "your prompt" | node dist/cli.mjs -p
+```
+
+To give a kevin file-write access (required for code fixes):
+```bash
+echo "your prompt" | node dist/cli.mjs -p --dangerously-skip-permissions
+```
+
+The child has no access to the parent's conversation history — every kevin prompt must be self-contained with all necessary context included.
+
+## Web Search
+
+In-process search backends (DDG, Brave, SearXNG) have been removed — they were broken or required API keys. The WebSearch tool's Anthropic-specific response format is incompatible with the OpenAI shim.
+
+**Use the standalone search tool instead:**
+```bash
+$(dirname $0)/../tools/search/search "your query"
+# or by absolute path once set up:
+/path/to/openclaude/tools/search/search "your query" --json
+/path/to/openclaude/tools/search/search "your query" --limit 3
+```
+
+Kevins can call this via Bash, but **must be spawned with `--dangerously-skip-permissions`** — without it, bash commands require interactive approval and the Kevin stalls in `-p` mode.
+
+Remaining files: `src/tools/WebSearchTool/` (kept, Anthropic-first-party mode only), `src/services/search/` (stub that returns []).
+- index.ts: picks backend by priority
+- searxng.ts, brave.ts, ddg.ts: individual clients
+
 ## Important repo notes
 
 - The build assumes Bun and Node 20+.
 - `dist/cli.mjs` is generated; rebuild after changing source files that affect the bundle.
 - `README.md` contains the supported provider setup, environment variables, and runtime hardening commands; keep this file aligned with it when behavior changes.
+
+---
+
+## New Machine Setup
+
+Everything needed to reproduce this environment is self-contained in `~/openclaude/`. The `tools/` subdirectory holds the standalone utilities; `bin/` holds shell launchers.
+
+### Directory layout
+
+```
+openclaude/
+  bin/
+    greg.sh            # Greg launcher (Gemini + Kevin fallback)
+  tools/
+    gemini/            # Gemini/Gemma Python client + capability test suite
+    search/            # Standalone web search (gpt-4o-search-preview)
+    email/             # Jarvan email service (SMTP/IMAP, FastAPI)
+  .env                 # API keys — fill this in (gitignored)
+  .env.example         # Template showing all required keys
+  setup-new-machine.sh # One-shot bootstrap script
+  dist/cli.mjs         # Built CLI (run bun run build to regenerate)
+```
+
+### Step 1 — clone, build, and fill in keys
+
+```bash
+git clone <repo-url> ~/openclaude
+cd ~/openclaude
+bash setup-new-machine.sh   # installs deps, builds, creates venvs, copies .env.example → .env
+```
+
+Then edit `~/openclaude/.env` and fill in your API keys — that's the only config needed. All tools (greg.sh, search, email, gemini) load from this single file automatically.
+
+### Step 2 — fill in .env
+
+Edit `~/openclaude/.env` and fill in your API keys. That's it — `~/CLAUDE.md` is generated automatically by `setup-new-machine.sh` from `PARENT_CLAUDE.md`.
+
+### Subagent quick reference
+
+| Name | Model | Invoke |
+|------|-------|--------|
+| Greg | gemini-3.1-flash-lite → Kevin fallback | `echo "prompt" \| bash ~/openclaude/bin/greg.sh [--dangerously-skip-permissions]` |
+| Kevin | gpt-5.4-mini (OpenAI shim) | `echo "prompt" \| node ~/openclaude/dist/cli.mjs -p [--dangerously-skip-permissions]` |
+| Chris | Claude Sonnet/Opus (native) | `echo "prompt" \| claude -p` or `Agent` tool in Claude Code session |
+
+**Rules for all subagent prompts:**
+- Include `Your working directory is /absolute/path` explicitly — subagents don't inherit cwd from conversation.
+- Include all context — subagents have no access to the current conversation history.
+- Use `--dangerously-skip-permissions` for any task that runs bash commands or writes files; without it the child stalls waiting for interactive approval.
+- 5-minute timeout per call.

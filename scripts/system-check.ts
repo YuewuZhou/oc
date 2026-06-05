@@ -51,6 +51,9 @@ function parseOptions(argv: string[]): CliOptions {
       if (next && !next.startsWith('--')) {
         options.outFile = next
         i++
+      } else {
+        console.error('Missing value for --out')
+        process.exit(1)
       }
     }
   }
@@ -194,6 +197,53 @@ function checkOpenAIEnv(): CheckResult[] {
   return results
 }
 
+async function checkSearchBackend(): Promise<CheckResult[]> {
+  const results: CheckResult[] = []
+  const searxngUrl = process.env.SEARXNG_URL
+  const braveKey = process.env.BRAVE_SEARCH_API_KEY
+  const useOpenAI = isTruthy(process.env.CLAUDE_CODE_USE_OPENAI)
+
+  if (searxngUrl) {
+    results.push(pass('Search backend', 'SearXNG active.'))
+    results.push(pass('SEARXNG_URL', searxngUrl))
+
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 4000)
+      const response = await fetch(searxngUrl, {
+        method: 'HEAD',
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+
+      if (response.ok || response.status === 401 || response.status === 403 || response.status === 405) {
+        results.push(pass('SearXNG reachability', `Reached ${searxngUrl} (status ${response.status}).`))
+      } else {
+        results.push(fail('SearXNG reachability', `Unexpected status ${response.status} from ${searxngUrl}.`))
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      results.push(fail('SearXNG reachability', `Failed to reach ${searxngUrl}: ${message}`))
+    }
+
+    return results
+  }
+
+  if (braveKey) {
+    results.push(pass('Search backend', 'Brave Search active.'))
+    results.push(pass('BRAVE_SEARCH_API_KEY', 'Configured.'))
+    return results
+  }
+
+  if (useOpenAI) {
+    results.push(pass('Search backend', 'DDG active.'))
+    return results
+  }
+
+  results.push(pass('Search backend', 'Not configured.'))
+  return results
+}
+
 async function checkBaseUrlReachability(): Promise<CheckResult> {
   const useGemini = isTruthy(process.env.CLAUDE_CODE_USE_GEMINI)
   const useOpenAI = isTruthy(process.env.CLAUDE_CODE_USE_OPENAI)
@@ -284,7 +334,6 @@ function checkOllamaProcessorMode(): CheckResult {
   const result = spawnSync('ollama', ['ps'], {
     cwd: process.cwd(),
     encoding: 'utf8',
-    shell: true,
   })
 
   if (result.status !== 0) {
@@ -378,6 +427,7 @@ async function main(): Promise<void> {
   results.push(checkBunRuntime())
   results.push(checkBuildArtifacts())
   results.push(...checkOpenAIEnv())
+  results.push(...checkSearchBackend())
   results.push(await checkBaseUrlReachability())
   results.push(checkOllamaProcessorMode())
 

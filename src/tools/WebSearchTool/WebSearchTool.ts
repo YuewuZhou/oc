@@ -115,13 +115,20 @@ function makeOutputFromSearchResponse(
     if (block.type === 'web_search_tool_result') {
       // Handle error case - content is a WebSearchToolResultError
       if (!Array.isArray(block.content)) {
-        const errorMessage = `Web search error: ${block.content.error_code}`
+        const errorMessage =
+          typeof block.content === 'object' &&
+          block.content &&
+          'error_code' in block.content
+            ? `Web search error: ${String((block.content as { error_code?: unknown }).error_code ?? 'unknown')}`
+            : 'Web search error: unknown'
         logError(new Error(errorMessage))
         results.push(errorMessage)
         continue
       }
       // Success case - add results to our collection
-      const hits = block.content.map(r => ({ title: r.title, url: r.url }))
+      const hits = block.content
+        .filter((r): r is { title: string; url: string } => Boolean(r && r.title && r.url))
+        .map(r => ({ title: r.title, url: r.url }))
       results.push({
         tool_use_id: block.tool_use_id,
         content: hits,
@@ -138,7 +145,7 @@ function makeOutputFromSearchResponse(
     }
   }
 
-  if (textAcc.length) {
+  if (textAcc.trim().length) {
     results.push(textAcc.trim())
   }
 
@@ -166,6 +173,8 @@ export const WebSearchTool = buildTool({
     return summary ? `Searching for ${summary}` : 'Searching the web'
   },
   isEnabled() {
+    if (process.env.CLAUDE_CODE_USE_OPENAI) return !!process.env.OPENAI_SEARCH_MODEL
+
     const provider = getAPIProvider()
     const model = getMainLoopModel()
 
