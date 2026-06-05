@@ -128,11 +128,12 @@ Edit `~/openclaude/.env` and fill in your API keys. That's it — `~/CLAUDE.md` 
 | Name | Model | Invoke |
 |------|-------|--------|
 | Greg | gemini-3.1-flash-lite → Kevin fallback | `echo "prompt" \| bash ~/openclaude/bin/greg.sh [--dangerously-skip-permissions]` |
-| Kevin | gpt-5.4-mini (OpenAI shim) | `echo "prompt" \| node ~/openclaude/dist/cli.mjs -p [--dangerously-skip-permissions]` |
+| Kevin | gpt-5.4-mini (OpenAI shim) | `echo "prompt" \| bash ~/openclaude/bin/kevin.sh [--dangerously-skip-permissions]` |
 | Chris | Claude Sonnet/Opus (native) | `echo "prompt" \| claude -p` or `Agent` tool in Claude Code session |
 
 **Rules for all subagent prompts:**
 - Include `Your working directory is /absolute/path` explicitly — subagents don't inherit cwd from conversation.
 - Include all context — subagents have no access to the current conversation history.
 - Use `--dangerously-skip-permissions` for any task that runs bash commands or writes files; without it the child stalls waiting for interactive approval.
+- **Root environment:** The CLI blocks `--dangerously-skip-permissions` when `uid == 0` unless `IS_SANDBOX=1` is set. Both `greg.sh` and `kevin.sh` handle this automatically. Do not invoke `node dist/cli.mjs` directly with `--dangerously-skip-permissions` as root.
 - 5-minute timeout per call.

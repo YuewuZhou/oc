@@ -47,13 +47,15 @@ Tries `gemini-3.1-flash-lite` first; falls back to Kevin automatically on 429 ra
 
 ```bash
 # Read-only task
-echo "your prompt" | node <OPENCLAUDE_PATH>/dist/cli.mjs -p
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/kevin.sh
 
 # Task that runs bash commands or edits files
-echo "your prompt" | node <OPENCLAUDE_PATH>/dist/cli.mjs -p --dangerously-skip-permissions
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/kevin.sh --dangerously-skip-permissions
 ```
 
 **Default to `--dangerously-skip-permissions` unless the task is purely text-in/text-out.** Without it, any bash call stalls waiting for interactive approval.
+
+> **Root environment note:** The openclaude CLI blocks `--dangerously-skip-permissions` when `uid == 0` unless `IS_SANDBOX=1` is set. `kevin.sh` (and `greg.sh`) handle this automatically. Do not invoke `node dist/cli.mjs` directly with `--dangerously-skip-permissions` as root — use the shell wrappers instead.
 
 ### Chris shell invocation
 
