@@ -1,0 +1,22 @@
+# Run: docker compose -f docker-compose.searxng.yml up -d
+services:
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - BASE_URL=http://localhost:8080/
+      - INSTANCE_NAME=OpenClaude Search
+      - SEARXNG_SECRET=opensearch-secret
+    healthcheck:
+      test: [CMD, wget, -qO-, http://localhost:8080/search?q=test&format=json]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - searxng-data:/etc/searxng
+      - ./searxng-config/settings.yml:/etc/searxng/settings.yml:ro
+
+volumes:
+  searxng-data:

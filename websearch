@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${SEARCH_API_URL:=http://localhost:8080/search}"
+
+query="${1:?usage: websearch <query>}"
+limit="${WEBSEARCH_LIMIT:-10}"
+format="${WEBSEARCH_FORMAT:-text}"
+
+response="$(curl -fsS --get "$SEARCH_API_URL" \
+  --data-urlencode "q=$query" \
+  --data-urlencode "format=json" \
+  --data-urlencode "language=en" \
+  --data-urlencode "safesearch=1" \
+  --max-time 20)"
+
+if [[ "$format" == "json" ]]; then
+  printf '%s\n' "$response" | jq .
+  exit 0
+fi
+
+printf '%s\n' "$response" \
+  | jq -r --argjson limit "$limit" '
+    .results[:$limit][]? |
+    "TITLE: \(.title)\nURL: \(.url)\nSNIPPET: \(.content // "")\n"
+  '

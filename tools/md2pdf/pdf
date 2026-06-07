@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+REAL="$(readlink -f "${BASH_SOURCE[0]}")"
+exec "$(dirname "$REAL")/md2pdf.sh" "$@"

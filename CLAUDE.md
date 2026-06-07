@@ -63,6 +63,35 @@ echo "your prompt" | bash bin/greg.sh --dangerously-skip-permissions
 
 The child has no access to the parent's conversation history — every greg prompt must be self-contained with all necessary context included.
 
+## Puppeteer Browser Tool
+
+Standalone headless browser CLI at `tools/puppeteer/snapshot`. Chromium is bundled via the `puppeteer` npm package — no system browser required.
+
+```bash
+# Screenshot → prints /tmp path; then Read the path to see the image
+tools/puppeteer/snapshot https://example.com
+
+# Full-page screenshot
+tools/puppeteer/snapshot https://example.com --full-page
+
+# Custom output path
+tools/puppeteer/snapshot https://example.com --output /tmp/snap.png
+
+# Get page text
+tools/puppeteer/snapshot https://example.com --content
+
+# Get full HTML
+tools/puppeteer/snapshot https://example.com --content --html
+
+# Evaluate JS, print result
+tools/puppeteer/snapshot https://example.com --eval "document.title"
+
+# Click a selector, then screenshot
+tools/puppeteer/snapshot https://example.com --click "#btn"
+```
+
+Source: `tools/puppeteer/snapshot.mjs`. The `snapshot` shell wrapper `cd`s to the repo root so Node resolves puppeteer from `node_modules/`.
+
 ## Web Search
 
 Greg handles web search natively — delegate search tasks to Greg via `greg.sh`. In-process search backends (DDG, Brave, SearXNG) have been removed.
