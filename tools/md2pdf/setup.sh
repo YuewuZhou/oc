@@ -3,7 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 VENV="$SCRIPT_DIR/venv"
-BIN_LINK="$HOME/.local/bin/pdf"
+BIN_PDF="$HOME/.local/bin/pdf"
+BIN_MD2PDF="$HOME/.local/bin/md2pdf"
 
 echo "==> Setting up md2pdf..."
 
@@ -15,10 +16,12 @@ fi
 echo "    Installing Python packages (markdown, weasyprint)..."
 "$VENV/bin/pip" install --quiet --upgrade markdown weasyprint
 
-# 2. Symlink the pdf command into ~/.local/bin
-mkdir -p "$(dirname "$BIN_LINK")"
-ln -sf "$SCRIPT_DIR/pdf" "$BIN_LINK"
-echo "    Symlinked: $BIN_LINK -> $SCRIPT_DIR/pdf"
+# 2. Symlink pdf and md2pdf commands into ~/.local/bin
+mkdir -p "$HOME/.local/bin"
+ln -sf "$SCRIPT_DIR/pdf" "$BIN_PDF"
+echo "    Symlinked: $BIN_PDF -> $SCRIPT_DIR/pdf"
+ln -sf "$SCRIPT_DIR/pdf" "$BIN_MD2PDF"
+echo "    Symlinked: $BIN_MD2PDF -> $SCRIPT_DIR/pdf"
 
 # 3. Ensure ~/.local/bin is in PATH via ~/.bashrc
 EXPORT_LINE='export PATH="$HOME/.local/bin:$PATH"'
@@ -34,5 +37,5 @@ else
 fi
 
 echo ""
-echo "Done. Usage: pdf <file.md> [output.pdf]"
+echo "Done. Usage: pdf <file.md> [output.pdf]  (also available as: md2pdf)"
 echo "Restart your shell (or run: source ~/.bashrc) for the alias to take effect in new sessions."

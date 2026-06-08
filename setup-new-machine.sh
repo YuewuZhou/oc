@@ -50,8 +50,24 @@ setup_venv() {
 setup_venv "search" "openai python-dotenv"
 setup_venv "gemini" "google-genai python-dotenv"
 setup_venv "email"  ""   # has requirements.txt (includes python-dotenv)
+setup_venv "md2pdf" "markdown weasyprint"
 
 echo "  ✓ all venvs ready"
+echo ""
+
+# ── 2b. md2pdf CLI aliases ────────────────────────────────────────────────────
+echo "[2b] Symlinking pdf and md2pdf into ~/.local/bin..."
+mkdir -p "$HOME/.local/bin"
+ln -sf "$REPO/tools/md2pdf/pdf" "$HOME/.local/bin/pdf"
+ln -sf "$REPO/tools/md2pdf/pdf" "$HOME/.local/bin/md2pdf"
+echo "  ✓ pdf and md2pdf -> $REPO/tools/md2pdf/pdf"
+EXPORT_LINE='export PATH="$HOME/.local/bin:$PATH"'
+if ! grep -qF "$EXPORT_LINE" "$HOME/.bashrc" 2>/dev/null; then
+  printf '\n# md2pdf: ensure ~/.local/bin is in PATH\n%s\n' "$EXPORT_LINE" >> "$HOME/.bashrc"
+  echo "  ✓ PATH export added to ~/.bashrc"
+else
+  echo "  ~/.bashrc already exports ~/.local/bin — skipping"
+fi
 echo ""
 
 # ── 3. Generate ~/CLAUDE.md from template ────────────────────────────────────
