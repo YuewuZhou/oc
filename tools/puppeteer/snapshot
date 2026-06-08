@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Wrapper so node resolves puppeteer from openclaude's node_modules
+cd /home/zack/openclaude
+exec node /home/zack/openclaude/tools/puppeteer/snapshot.mjs "$@"

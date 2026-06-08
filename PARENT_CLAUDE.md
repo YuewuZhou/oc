@@ -63,6 +63,20 @@ Source: `<OPENCLAUDE_PATH>/src/tools/OpenClaudeTool/OpenClaudeTool.ts`
 
 Greg handles web search natively — delegate any search task to Greg via `greg.sh`. No standalone search tool is needed.
 
+## Markdown to PDF
+
+Convert a Markdown file to PDF (copies to Windows Downloads if available):
+
+```bash
+pdf <file.md> [output.pdf]
+# or equivalently:
+md2pdf <file.md> [output.pdf]
+```
+
+Both `pdf` and `md2pdf` are aliases that invoke `<OPENCLAUDE_PATH>/tools/md2pdf/md2pdf.sh`. The primary backend is a local Python venv (weasyprint); it falls back to pandoc, wkhtmltopdf, or chromium headless automatically.
+
+Source: `<OPENCLAUDE_PATH>/tools/md2pdf/`.
+
 ## Email Reports
 
 Send a search result (or any stdin text) as an email via the Jarvan email service:
