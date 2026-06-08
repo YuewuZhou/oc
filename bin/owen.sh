@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Greg — Gemini subagent launcher.
+# Owen — OpenAI subagent launcher.
+# Model is read from OWEN_MODEL in .env (defaults to OPENAI_MODEL, then gpt-4o).
 #
-# Usage: echo "prompt" | bash /path/to/openclaude/bin/greg.sh [--dangerously-skip-permissions]
+# Usage: echo "prompt" | bash /path/to/openclaude/bin/owen.sh [--dangerously-skip-permissions]
 
 SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 CLI="$SCRIPT_DIR/../dist/cli.mjs"
@@ -20,8 +21,5 @@ if [[ -f "$SCRIPT_DIR/../.env" ]]; then
 fi
 
 echo "$PROMPT" | env \
-    CLAUDE_CODE_USE_GEMINI=1 \
-    GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-flash-lite}" \
-    OPENAI_API_KEY="$GEMINI_API_KEY" \
-    OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai \
+    OPENAI_MODEL="${OWEN_MODEL:-${OPENAI_MODEL:-gpt-4o}}" \
     node "$CLI" -p --dangerously-skip-permissions "$@"

@@ -100,10 +100,10 @@ function runCommand(command: string, env: NodeJS.ProcessEnv): Promise<number> {
   return runProcess(command, [], env)
 }
 
-function runProcess(command: string, args: string[], env: NodeJS.ProcessEnv): Promise<number> {
+function runProcess(command: string, args: string[], env: NodeJS.ProcessEnv, cwd?: string): Promise<number> {
   return new Promise(resolve => {
     const child = spawn(command, args, {
-      cwd: process.cwd(),
+      cwd: cwd ?? process.cwd(),
       env,
       stdio: 'inherit',
     })
@@ -233,7 +233,8 @@ async function main(): Promise<void> {
     process.exit(buildCode)
   }
 
-  const devCode = await runProcess('node', ['dist/cli.mjs', ...options.passthroughArgs], env)
+  const launchCwd = process.env.OPENCLAUDE_LAUNCH_CWD ?? process.cwd()
+  const devCode = await runProcess('node', ['dist/cli.mjs', ...options.passthroughArgs], env, launchCwd)
   process.exit(devCode)
 }
 

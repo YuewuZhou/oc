@@ -2,7 +2,9 @@ import { spawn } from 'child_process'
 import * as React from 'react'
 import { z } from 'zod/v4'
 import { buildTool, type ToolDef } from '../../Tool.js'
+import { Text } from '../../ink.js'
 import { lazySchema } from '../../utils/lazySchema.js'
+import { getSessionBypassPermissionsMode } from '../../bootstrap/state.js'
 
 export const OPEN_CLAUDE_TOOL_NAME = 'SubAgent'
 
@@ -31,9 +33,17 @@ function runSubAgent(prompt: string, signal: AbortSignal): Promise<Output> {
   return new Promise((resolve, reject) => {
     let settled = false
     const cliPath = process.argv[1]!
-    const child = spawn(process.execPath, [cliPath, '-p'], {
+    const args = [cliPath, '-p']
+    const env = { ...process.env }
+
+    if (getSessionBypassPermissionsMode()) {
+      args.push('--dangerously-skip-permissions')
+      env.IS_SANDBOX = '1'
+    }
+
+    const child = spawn(process.execPath, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: process.env,
+      env,
       cwd: process.cwd(),
     })
 
@@ -157,7 +167,7 @@ export const OpenClaudeTool = buildTool({
       prompt: string
     }>
     return React.createElement(
-      'span',
+      Text,
       null,
       description
         ? `SubAgent: ${description}`
@@ -171,11 +181,11 @@ export const OpenClaudeTool = buildTool({
     const { response, exitCode } = output
     if (exitCode !== 0) {
       return React.createElement(
-        'span',
+        Text,
         null,
         `SubAgent failed (exit ${exitCode}): ${response.slice(0, 200)}`,
       )
     }
-    return React.createElement('span', null, response.slice(0, 200))
+    return React.createElement(Text, null, response.slice(0, 200))
   },
 } satisfies ToolDef<InputSchema, Output>)

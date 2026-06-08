@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Greg — Gemini subagent launcher.
+# Greg — Auto-approve subagent launcher (always skips permissions).
 #
-# Usage: echo "prompt" | bash /path/to/openclaude/bin/greg.sh [--dangerously-skip-permissions]
+# Usage: echo "prompt" | bash /path/to/openclaude/bin/auto-approve.sh
 
 SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 CLI="$SCRIPT_DIR/../dist/cli.mjs"
 PROMPT=$(cat)
 
 # openclaude's CLI blocks --dangerously-skip-permissions when running as root (uid 0)
-# unless IS_SANDBOX=1 is set. Export it automatically so invocations work in this env.
+# unless IS_SANDBOX=1 is set.
 if [[ "$(id -u)" -eq 0 ]]; then
     export IS_SANDBOX=1
 fi

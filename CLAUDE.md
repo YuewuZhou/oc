@@ -89,6 +89,8 @@ Everything needed to reproduce this environment is self-contained in `~/openclau
 openclaude/
   bin/
     greg.sh            # Greg launcher (Gemini)
+    derek.sh           # Derek launcher (DeepSeek)
+    owen.sh            # Owen launcher (OpenAI)
   tools/
     gemini/            # Gemini/Gemma Python client + capability test suite
     email/             # Jarvan email service (SMTP/IMAP, FastAPI)
@@ -117,6 +119,8 @@ Edit `~/openclaude/.env` and fill in your API keys. That's it — `~/CLAUDE.md` 
 | Name | Model | Invoke |
 |------|-------|--------|
 | Greg | gemini-3.1-flash-lite (Gemini) | `echo "prompt" \| bash ~/openclaude/bin/greg.sh [--dangerously-skip-permissions]` |
+| Derek | deepseek-v4-flash (DeepSeek) | `echo "prompt" \| bash ~/openclaude/bin/derek.sh` |
+| Owen | gpt-4o (OpenAI) | `echo "prompt" \| bash ~/openclaude/bin/owen.sh [--dangerously-skip-permissions]` |
 | Kevin | Claude Sonnet/Opus (native) | `Agent` tool in Claude Code session |
 
 **Rules for all subagent prompts:**
