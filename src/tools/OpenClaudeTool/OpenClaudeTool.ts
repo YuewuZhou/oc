@@ -29,6 +29,9 @@ const outputSchema = lazySchema(() =>
 type OutputSchema = ReturnType<typeof outputSchema>
 export type Output = z.infer<OutputSchema>
 
+// 8 MB cap per stream — prevents runaway subagent output from OOMing the parent
+const MAX_BUFFER_CHARS = 8 * 1024 * 1024
+
 function runSubAgent(prompt: string, signal: AbortSignal): Promise<Output> {
   return new Promise((resolve, reject) => {
     let settled = false
@@ -41,6 +44,12 @@ function runSubAgent(prompt: string, signal: AbortSignal): Promise<Output> {
       env.IS_SANDBOX = '1'
     }
 
+    // Propagate heap cap to subagent so it also can't OOM the host
+    const existingNodeOptions = env.NODE_OPTIONS ?? ''
+    if (!existingNodeOptions.includes('--max-old-space-size')) {
+      env.NODE_OPTIONS = `--max-old-space-size=1024 ${existingNodeOptions}`.trim()
+    }
+
     const child = spawn(process.execPath, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env,
@@ -49,12 +58,24 @@ function runSubAgent(prompt: string, signal: AbortSignal): Promise<Output> {
 
     let stdout = ''
     let stderr = ''
+    let stdoutTruncated = false
+    let stderrTruncated = false
 
     child.stdout.on('data', (chunk: Buffer) => {
+      if (stdoutTruncated) return
       stdout += chunk.toString()
+      if (stdout.length > MAX_BUFFER_CHARS) {
+        stdout = stdout.slice(0, MAX_BUFFER_CHARS) + '\n[SubAgent output truncated at 8 MB]'
+        stdoutTruncated = true
+      }
     })
     child.stderr.on('data', (chunk: Buffer) => {
+      if (stderrTruncated) return
       stderr += chunk.toString()
+      if (stderr.length > MAX_BUFFER_CHARS) {
+        stderr = stderr.slice(0, MAX_BUFFER_CHARS) + '\n[SubAgent stderr truncated at 8 MB]'
+        stderrTruncated = true
+      }
     })
 
     const timeoutId = setTimeout(() => {

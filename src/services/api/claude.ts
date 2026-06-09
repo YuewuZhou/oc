@@ -102,9 +102,7 @@ import {
 import { getAPIContextManagement } from '../compact/apiMicrocompact.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
-  ? (require('../../utils/permissions/autoModeState.js') as typeof import('../../utils/permissions/autoModeState.js'))
-  : null
+const autoModeStateModule = require('../../utils/permissions/autoModeState.js') as typeof import('../../utils/permissions/autoModeState.js')
 
 import { feature } from 'bun:bundle'
 import type { ClientOptions } from '@anthropic-ai/sdk'
@@ -1410,16 +1408,14 @@ async function* queryModel(
   // per-call so non-agentic queries keep their own stable header set.
 
   let afkHeaderLatched = getAfkModeHeaderLatched() === true
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
-    if (
-      !afkHeaderLatched &&
-      isAgenticQuery &&
-      shouldIncludeFirstPartyOnlyBetas() &&
-      (autoModeStateModule?.isAutoModeActive() ?? false)
-    ) {
-      afkHeaderLatched = true
-      setAfkModeHeaderLatched(true)
-    }
+  if (
+    !afkHeaderLatched &&
+    isAgenticQuery &&
+    shouldIncludeFirstPartyOnlyBetas() &&
+    (autoModeStateModule?.isAutoModeActive() ?? false)
+  ) {
+    afkHeaderLatched = true
+    setAfkModeHeaderLatched(true)
   }
 
   let fastModeHeaderLatched = getFastModeHeaderLatched() === true
@@ -1658,15 +1654,13 @@ async function* queryModel(
 
     // AFK mode beta: latched once auto mode is first activated. Still gated
     // by isAgenticQuery per-call so classifiers/compaction don't get it.
-    if (feature('TRANSCRIPT_CLASSIFIER')) {
-      if (
-        afkHeaderLatched &&
-        shouldIncludeFirstPartyOnlyBetas() &&
-        isAgenticQuery &&
-        !betasParams.includes(AFK_MODE_BETA_HEADER)
-      ) {
-        betasParams.push(AFK_MODE_BETA_HEADER)
-      }
+    if (
+      afkHeaderLatched &&
+      shouldIncludeFirstPartyOnlyBetas() &&
+      isAgenticQuery &&
+      !betasParams.includes(AFK_MODE_BETA_HEADER)
+    ) {
+      betasParams.push(AFK_MODE_BETA_HEADER)
     }
 
     // Cache editing beta: header is latched session-stable; useCachedMC

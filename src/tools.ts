@@ -85,6 +85,8 @@ import { TaskGetTool } from './tools/TaskGetTool/TaskGetTool.js'
 import { TaskUpdateTool } from './tools/TaskUpdateTool/TaskUpdateTool.js'
 import { TaskListTool } from './tools/TaskListTool/TaskListTool.js'
 import { OpenClaudeTool } from './tools/OpenClaudeTool/OpenClaudeTool.js'
+import { ProviderAgentTool } from './tools/ProviderAgentTool/ProviderAgentTool.js'
+import { GeminiSearchTool } from './tools/GeminiSearchTool/GeminiSearchTool.js'
 import uniqBy from 'lodash-es/uniqBy.js'
 import { isToolSearchEnabledOptimistic } from './utils/toolSearch.js'
 import { isTodoV2Enabled } from './utils/tasks.js'
@@ -210,9 +212,11 @@ export function getAllBaseTools(): Tools {
     PuppeteerTool,
     TodoWriteTool,
     WebSearchTool,
+    GeminiSearchTool,
     TaskStopTool,
     AskUserQuestionTool,
     OpenClaudeTool,
+    ProviderAgentTool,
     SkillTool,
     EnterPlanModeTool,
     ...(process.env.USER_TYPE === 'ant' ? [ConfigTool] : []),

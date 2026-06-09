@@ -63,6 +63,8 @@ echo "your prompt" | bash bin/greg.sh --dangerously-skip-permissions
 
 The child has no access to the parent's conversation history — every greg prompt must be self-contained with all necessary context included.
 
+> **If you are a Greg (running non-interactively via `-p`):** Do NOT use the SubAgent tool. You ARE the subagent — spawning another SubAgent creates an infinite recursive loop. Use your built-in tools (Bash, Read, Edit, Write) and native Gemini web search directly instead.
+
 ## Puppeteer Browser Tool
 
 Standalone headless browser CLI at `tools/puppeteer/snapshot`. Chromium is bundled via the `puppeteer` npm package — no system browser required.
@@ -94,11 +96,12 @@ Source: `tools/puppeteer/snapshot.mjs`. The `snapshot` shell wrapper `cd`s to th
 
 ## Web Search
 
-Greg handles web search natively — delegate search tasks to Greg via `greg.sh`. In-process search backends (DDG, Brave, SearXNG) have been removed.
+Web search is provided by two tools:
 
-Remaining files: `src/tools/WebSearchTool/` (kept, Anthropic-first-party mode only), `src/services/search/` (stub that returns []).
-- index.ts: picks backend by priority
-- searxng.ts, brave.ts, ddg.ts: individual clients
+- **`GeminiSearch`** (`src/tools/GeminiSearchTool/GeminiSearchTool.ts`) — direct `fetch()` to `generativelanguage.googleapis.com` with `tools: [{google_search: {}}]`. Returns a grounded answer + source citations. Enabled when `GEMINI_API_KEY` is set. This is what Greg uses.
+- **`WebSearch`** (`src/tools/WebSearchTool/`) — Anthropic-first-party only (uses the `web_search_20250305` beta). Enabled for `firstParty`, Vertex, and Foundry providers only.
+
+In-process search backends (DDG, Brave, SearXNG) have been removed. `src/services/search/` is a stub that returns `[]`.
 
 ## Important repo notes
 
@@ -145,12 +148,24 @@ Edit `~/openclaude/.env` and fill in your API keys. That's it — `~/CLAUDE.md` 
 
 ### Subagent quick reference
 
-| Name | Model | Invoke |
-|------|-------|--------|
-| Greg | gemini-3.1-flash-lite (Gemini) | `echo "prompt" \| bash ~/openclaude/bin/greg.sh [--dangerously-skip-permissions]` |
-| Derek | deepseek-v4-flash (DeepSeek) | `echo "prompt" \| bash ~/openclaude/bin/derek.sh` |
-| Owen | gpt-4o (OpenAI) | `echo "prompt" \| bash ~/openclaude/bin/owen.sh [--dangerously-skip-permissions]` |
-| Kevin | Claude Sonnet/Opus (native) | `Agent` tool in Claude Code session |
+| Name | Model | Tier | Invoke |
+|------|-------|------|--------|
+| Greg | gemini-2.5-flash-lite (Gemini) | Free | `echo "prompt" \| bash ~/openclaude/bin/greg.sh [--dangerously-skip-permissions]` |
+| Derek | deepseek-v4-flash (DeepSeek) | Paid | `echo "prompt" \| bash ~/openclaude/bin/derek.sh [--dangerously-skip-permissions]` |
+| Owen | gpt-4o-mini (OpenAI) | Paid | `echo "prompt" \| bash ~/openclaude/bin/owen.sh [--dangerously-skip-permissions]` |
+| Greta | llama-3.3-70b-versatile (Groq) | **Free** | `echo "prompt" \| bash ~/openclaude/bin/groq.sh [--dangerously-skip-permissions]` |
+| Robin | llama-3.3-70b-instruct:free (OpenRouter) | **Free** | `echo "prompt" \| bash ~/openclaude/bin/router.sh [--dangerously-skip-permissions]` |
+| Nina | llama-3.3-70b-instruct (NVIDIA NIM) | **Free** | `echo "prompt" \| bash ~/openclaude/bin/nim.sh [--dangerously-skip-permissions]` |
+| Mira | mistral-small-latest (Mistral) | **Free** | `echo "prompt" \| bash ~/openclaude/bin/mistral.sh [--dangerously-skip-permissions]` |
+| Gabby | gpt-4o-mini (GitHub Models) | **Free** | `echo "prompt" \| bash ~/openclaude/bin/github.sh [--dangerously-skip-permissions]` |
+| Kevin | Claude Sonnet/Opus (native) | Paid | `Agent` tool in Claude Code session |
+
+**`ProviderAgent` tool** — dispatch to any named provider from within OpenClaude without a shell:
+```
+Use ProviderAgent with provider="groq" (or greg/derek/owen/router/nim/mistral/github)
+to route a self-contained task to that provider's model.
+```
+Call multiple `ProviderAgent`s in parallel to fan out work across free providers simultaneously.
 
 **Rules for all subagent prompts:**
 - Include `Your working directory is /absolute/path` explicitly — subagents don't inherit cwd from conversation.

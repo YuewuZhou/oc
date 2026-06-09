@@ -21,5 +21,9 @@ if [[ -f "$SCRIPT_DIR/../.env" ]]; then
 fi
 
 echo "$PROMPT" | env \
+    CLAUDE_CODE_USE_OPENAI=1 \
+    CLAUDE_CODE_USE_GEMINI= \
+    GEMINI_MODEL= \
     OPENAI_MODEL="${OWEN_MODEL:-${OPENAI_MODEL:-gpt-4o}}" \
     node "$CLI" -p --dangerously-skip-permissions "$@"
+

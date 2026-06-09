@@ -6,6 +6,7 @@ import type { Task } from '../utils/tasks.js'
 import {
   getTaskListId,
   getTasksDir,
+  getTasksLastModifiedMs,
   isTodoV2Enabled,
   listTasks,
   onTasksUpdated,
@@ -16,6 +17,8 @@ import { isTeamLead } from '../utils/teammate.js'
 const HIDE_DELAY_MS = 5000
 const DEBOUNCE_MS = 50
 const FALLBACK_POLL_MS = 5000 // Fallback in case fs.watch misses events
+/** After this many ms with no task file changes, auto-reset an incomplete task list. */
+const STALE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 /**
  * Singleton store for the TodoV2 task list. Owns the file watcher, timers,
@@ -39,6 +42,7 @@ class TasksV2Store {
   #watcher: FSWatcher | null = null
   #watchedDir: string | null = null
   #hideTimer: ReturnType<typeof setTimeout> | null = null
+  #staleTimer: ReturnType<typeof setTimeout> | null = null
   #debounceTimer: ReturnType<typeof setTimeout> | null = null
   #pollTimer: ReturnType<typeof setTimeout> | null = null
   #unsubscribeTasksUpdated: (() => void) | null = null
@@ -120,12 +124,39 @@ class TasksV2Store {
     )
     this.#tasks = current
 
+    // Every fetch clears the stale timer; we reschedule below if needed.
+    this.#clearStaleTimer()
+
     const hasIncomplete = current.some(t => t.status !== 'completed')
 
-    if (hasIncomplete || current.length === 0) {
-      // Has unresolved tasks (open/in_progress) or empty — reset hide state
-      this.#hidden = current.length === 0
+    if (current.length === 0) {
+      this.#hidden = true
       this.#clearHideTimer()
+    } else if (hasIncomplete) {
+      // Has unresolved tasks — check whether they've gone stale (no file changes
+      // for STALE_TTL_MS). Stale tasks are auto-reset so the list closes.
+      this.#hidden = false
+      this.#clearHideTimer()
+
+      const lastModMs = await getTasksLastModifiedMs(taskListId)
+      if (lastModMs !== null && Date.now() - lastModMs >= STALE_TTL_MS) {
+        // Tasks abandoned — reset the list so the UI closes
+        await resetTaskList(taskListId)
+        this.#tasks = []
+        this.#hidden = true
+        this.#notify()
+        return
+      }
+
+      // Not yet stale — schedule a wakeup at the stale deadline
+      if (lastModMs !== null) {
+        const remaining = STALE_TTL_MS - (Date.now() - lastModMs)
+        this.#staleTimer = setTimeout(
+          this.#debouncedFetch,
+          Math.max(1000, remaining),
+        )
+        this.#staleTimer.unref()
+      }
     } else if (this.#hideTimer === null && !this.#hidden) {
       // All tasks just became completed — schedule clear
       this.#hideTimer = setTimeout(
@@ -178,6 +209,13 @@ class TasksV2Store {
     }
   }
 
+  #clearStaleTimer(): void {
+    if (this.#staleTimer) {
+      clearTimeout(this.#staleTimer)
+      this.#staleTimer = null
+    }
+  }
+
   /**
    * Tear down the watcher, timers, and in-process subscription. Called when
    * the last subscriber unsubscribes. Preserves #tasks/#hidden cache so a
@@ -190,6 +228,7 @@ class TasksV2Store {
     this.#unsubscribeTasksUpdated?.()
     this.#unsubscribeTasksUpdated = null
     this.#clearHideTimer()
+    this.#clearStaleTimer()
     if (this.#debounceTimer) clearTimeout(this.#debounceTimer)
     if (this.#pollTimer) clearTimeout(this.#pollTimer)
     this.#debounceTimer = null

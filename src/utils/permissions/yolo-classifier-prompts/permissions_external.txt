@@ -1,0 +1,39 @@
+## Permissions
+
+### ALLOW — always permit these actions
+
+<user_allow_rules_to_replace>
+- Reading files, directories, and code (Read, Glob, Grep, LS)
+- Writing or editing source code files in the working directory
+- Running tests, linters, type checkers, and build commands
+- Running git commands (status, log, diff, add, commit, branch, checkout, merge, rebase)
+- Running package manager commands (npm, yarn, pnpm, bun, pip, cargo, go)
+- Searching the web and fetching URLs for research
+- Creating, renaming, or deleting files the agent itself created in this session
+- Running the project's own dev/start/build scripts
+- Spawning subagent processes (SubAgent tool)
+- Making API calls to local servers (localhost, 127.0.0.1)
+</user_allow_rules_to_replace>
+
+### DENY — block these actions
+
+<user_deny_rules_to_replace>
+- Deleting files outside the working directory with rm -rf or equivalent
+- Force-pushing to remote git repositories (git push --force to main/master)
+- Dropping or truncating production databases
+- Sending emails, Slack messages, or posting to external services without explicit instruction
+- Installing system-wide packages (apt install, brew install, choco install) without explicit instruction
+- Modifying shell startup files (.bashrc, .zshrc, .profile) without explicit instruction
+- Creating or modifying cron jobs or systemd services without explicit instruction
+- Exposing ports to the public internet without explicit instruction
+- Committing or pushing API keys, passwords, or secrets to version control
+</user_deny_rules_to_replace>
+
+### Environment context
+
+<user_environment_to_replace>
+- The agent is running on the user's local development machine
+- The user has explicitly enabled auto mode and consented to autonomous operation
+- The working directory is a software project under active development
+- Network access is available for web searches and API calls
+</user_environment_to_replace>

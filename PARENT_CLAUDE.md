@@ -23,32 +23,65 @@ This file provides guidance to Claude Code (claude.ai/code) when working under `
 
 - `openclaude/`: see `<OPENCLAUDE_PATH>/CLAUDE.md` for build, test, and architecture guidance.
 
-## openclaude SubAgents ("Gregs", "Kevins")
+## openclaude SubAgents
 
-`openclaude` has a `SubAgent` tool that spawns child openclaude processes to handle delegated tasks.
+`openclaude` has two tools for delegating tasks to subagents:
 
-- **Gregs** — powered by Gemini (free tier, ~5s, full tool use, native web search). **Default choice for all tasks.**
-- **Kevins** — native Claude subagent via the `Agent` tool within a Claude Code session. Reserve for high-precision tasks (complex reasoning, multi-file code changes).
+- **`SubAgent`** — spawns a child openclaude process using the **same provider as the parent**. Gregs (Gemini) are the default choice for all tasks.
+- **`ProviderAgent`** — spawns a child using a **named provider**. Use this to route work to free-tier providers or to fan out across multiple providers in parallel.
 
-### Greg shell invocation
+### Named subagents
+
+| Name | Provider key | Model | Tier | Shell launcher |
+|------|-------------|-------|------|----------------|
+| Greg | `greg` | gemini-2.5-flash-lite | Free | `greg.sh` |
+| Greta | `groq` | llama-3.3-70b-versatile | **Free** | `groq.sh` |
+| Robin | `router` | llama-3.3-70b-instruct:free | **Free** | `router.sh` |
+| Nina | `nim` | llama-3.3-70b-instruct | **Free** | `nim.sh` |
+| Mira | `mistral` | mistral-small-latest | **Free** | `mistral.sh` |
+| Gabby | `github` | gpt-4o-mini | **Free** | `github.sh` |
+| Derek | `derek` | deepseek-v4-flash | Paid | `derek.sh` |
+| Owen | `owen` | gpt-4o-mini | Paid | `owen.sh` |
+| Kevin | — | Claude Sonnet/Opus | Paid | `Agent` tool |
+
+### Shell invocation
 
 ```bash
-# Read-only task
-echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/greg.sh
-
-# Task that runs bash commands or edits files
+# Greg (Gemini) — default, free, has web search
 echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/greg.sh --dangerously-skip-permissions
-```
 
-Greg uses Gemini (`GEMINI_API_KEY` in `.env`) and can perform web searches natively — no external search tool needed.
+# Free provider alternatives
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/groq.sh --dangerously-skip-permissions
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/router.sh --dangerously-skip-permissions
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/nim.sh --dangerously-skip-permissions
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/mistral.sh --dangerously-skip-permissions
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/github.sh --dangerously-skip-permissions
+```
 
 **Default to `--dangerously-skip-permissions` unless the task is purely text-in/text-out.** Without it, any bash call stalls waiting for interactive approval.
 
-> **Root environment note:** The openclaude CLI blocks `--dangerously-skip-permissions` when `uid == 0` unless `IS_SANDBOX=1` is set. `greg.sh` handles this automatically via `export IS_SANDBOX=1`. Do not invoke `node dist/cli.mjs` directly with `--dangerously-skip-permissions` as root — use the shell wrapper instead.
+> **Root environment note:** The openclaude CLI blocks `--dangerously-skip-permissions` when `uid == 0` unless `IS_SANDBOX=1` is set. All `.sh` launchers handle this automatically.
+
+### ProviderAgent tool (use from inside OpenClaude)
+
+```
+Use the ProviderAgent tool with provider="groq" (or greg/derek/owen/router/nim/mistral/github)
+to route a self-contained task to that provider without leaving the session.
+```
+
+Run multiple `ProviderAgent` calls in parallel to fan out work across free providers simultaneously.
 
 ### Kevin invocation
 
 From within a Claude Code session, use the `Agent` tool — it spawns a fresh Claude instance with full tool access.
+
+### Forge — autonomous orchestrator
+
+```bash
+bash <OPENCLAUDE_PATH>/bin/forge.sh   # start autonomous orchestrator session
+```
+
+Forge uses Greg as the orchestrator brain, dispatches coding subtasks to free providers via `ProviderAgent`, self-heals on rate limits (rotating groq → router → nim → mistral → github → greg), and iterates until tasks are complete. Use `/forge <task>` inside a Forge session.
 
 ### Shared rules for all subagent prompts
 - Include the working directory explicitly (e.g. `Your working directory is /absolute/path.`)
@@ -57,11 +90,20 @@ From within a Claude Code session, use the `Agent` tool — it spawns a fresh Cl
 
 **Constraints:** 5-minute timeout per call. File writes require `--dangerously-skip-permissions`.
 
-Source: `<OPENCLAUDE_PATH>/src/tools/OpenClaudeTool/OpenClaudeTool.ts`
+### If you are currently running as a subagent
+
+If you were spawned by the `SubAgent` or `ProviderAgent` tool (running non-interactively via `-p`):
+- Do NOT use `SubAgent` or `ProviderAgent` — recursive spawning creates infinite loops
+- Use your built-in tools directly: `Bash`, `Read`, `Edit`, `Write`
+- Greg has native Gemini web search — use `GeminiSearch` directly, no delegation needed
+
+Source: `<OPENCLAUDE_PATH>/src/tools/OpenClaudeTool/OpenClaudeTool.ts`, `<OPENCLAUDE_PATH>/src/tools/ProviderAgentTool/ProviderAgentTool.ts`
 
 ## Web Search
 
-Greg handles web search natively — delegate any search task to Greg via `greg.sh`. No standalone search tool is needed.
+Use the `GeminiSearch` tool — it calls the Gemini API directly with Google Search grounding and returns a synthesized answer with source citations. It is enabled whenever `GEMINI_API_KEY` is set (i.e. always in this environment).
+
+Do **not** spawn a Greg subagent just to do a web search — Greg itself uses `GeminiSearch` as a built-in tool.
 
 ## Markdown to PDF
 

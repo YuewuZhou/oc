@@ -33,7 +33,7 @@ const featureFlags: Record<string, boolean> = {
   UDS_INBOX: false,
   BG_SESSIONS: false,
   AWAY_SUMMARY: false,
-  TRANSCRIPT_CLASSIFIER: false,
+  TRANSCRIPT_CLASSIFIER: true,
   WEB_BROWSER_TOOL: false,
   MESSAGE_ACTIONS: false,
   BUDDY: false,
@@ -108,7 +108,7 @@ export async function handleBgFlag() { throw new Error("Background sessions are 
         build.onLoad(
           { filter: /.*/, namespace: 'bun-bundle-shim' },
           () => ({
-            contents: `export function feature(name) { return false; }`,
+            contents: `const FLAGS = ${JSON.stringify(featureFlags)};\nexport function feature(name) { return FLAGS[name] === true; }`,
             loader: 'js',
           }),
         )
@@ -237,17 +237,31 @@ export const SeverityNumber = {};
           }),
         )
 
-        // Resolve .md and .txt file imports to empty string stubs
-        build.onResolve({ filter: /\.(md|txt)$/ }, (args) => ({
-          path: args.path,
-          namespace: 'text-stub',
-        }))
+        // Resolve .md and .txt file imports — inline content or stub to ''
+        build.onResolve({ filter: /\.(md|txt)$/ }, (args) => {
+          // Try to resolve relative to the importing file's directory
+          const { resolve } = require('path') as typeof import('path')
+          const importer = args.importer ? require('path').dirname(args.importer) : process.cwd()
+          const resolved = resolve(importer, args.path)
+          return { path: resolved, namespace: 'text-content' }
+        })
         build.onLoad(
-          { filter: /.*/, namespace: 'text-stub' },
-          () => ({
-            contents: `export default '';`,
-            loader: 'js',
-          }),
+          { filter: /.*/, namespace: 'text-content' },
+          (args) => {
+            try {
+              const content = readFileSync(args.path, 'utf-8')
+              return {
+                contents: `export default ${JSON.stringify(content)};`,
+                loader: 'js',
+              }
+            } catch {
+              // File not found — stub to empty string (keeps old behavior for missing files)
+              return {
+                contents: `export default '';`,
+                loader: 'js',
+              }
+            }
+          },
         )
       },
     },

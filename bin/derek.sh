@@ -21,6 +21,8 @@ fi
 
 echo "$PROMPT" | env \
     CLAUDE_CODE_USE_OPENAI=1 \
+    CLAUDE_CODE_USE_GEMINI= \
+    GEMINI_MODEL= \
     OPENAI_MODEL="${DEEPSEEK_MODEL:-deepseek-v4-flash}" \
     OPENAI_API_KEY="$DEEPSEEK_API_KEY" \
     OPENAI_BASE_URL=https://api.deepseek.com/v1 \

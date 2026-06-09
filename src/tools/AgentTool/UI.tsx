@@ -493,7 +493,7 @@ export function renderToolUseProgressMessage(progressMessages: ProgressMessage<P
       tokens
     } = getProgressStats();
     return <MessageResponse height={1}>
-        <Text dimColor>
+        <Text>
           In progress… · <Text bold>{toolUseCount}</Text> tool{' '}
           {toolUseCount === 1 ? 'use' : 'uses'}
           {tokens && ` · ${formatNumber(tokens)} tokens`} ·{' '}

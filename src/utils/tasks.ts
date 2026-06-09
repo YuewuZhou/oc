@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises'
+import { mkdir, readdir, readFile, stat, unlink, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { z } from 'zod/v4'
 import { getIsNonInteractiveSession, getSessionId } from '../bootstrap/state.js'
@@ -860,3 +860,31 @@ export async function unassignTeammateTasks(
 }
 
 export const DEFAULT_TASKS_MODE_TASK_LIST_ID = 'tasklist'
+
+/**
+ * Returns the most recent mtime (ms since epoch) across all task JSON files
+ * in the given task list, or null if the directory is empty / doesn't exist.
+ * Used to detect stale (abandoned) task lists.
+ */
+export async function getTasksLastModifiedMs(
+  taskListId: string,
+): Promise<number | null> {
+  const dir = getTasksDir(taskListId)
+  let files: string[]
+  try {
+    files = await readdir(dir)
+  } catch {
+    return null
+  }
+  let latest = 0
+  for (const file of files) {
+    if (!file.endsWith('.json') || file.startsWith('.')) continue
+    try {
+      const st = await stat(join(dir, file))
+      if (st.mtimeMs > latest) latest = st.mtimeMs
+    } catch {
+      // file may have been deleted between readdir and stat
+    }
+  }
+  return latest > 0 ? latest : null
+}
