@@ -27,61 +27,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working under `
 
 `openclaude` has two tools for delegating tasks to subagents:
 
-- **`SubAgent`** — spawns a child openclaude process using the **same provider as the parent**. Gregs (Gemini) are the default choice for all tasks.
-- **`ProviderAgent`** — spawns a child using a **named provider**. Use this to route work to free-tier providers or to fan out across multiple providers in parallel.
+- **`SubAgent`** — spawns a child openclaude process using the **same provider as the parent**. Dereks (DeepSeek) are the default choice for all tasks.
+- **`ProviderAgent`** — spawns a child using a **named provider**. Use this to fan out across providers in parallel.
 
 ### Named subagents
 
 | Name | Provider key | Model | Tier | Shell launcher |
 |------|-------------|-------|------|----------------|
-| Greg | `greg` | gemini-2.5-flash-lite | Free | `greg.sh` |
-| Greta | `groq` | llama-3.3-70b-versatile | **Free** | `groq.sh` |
-| Robin | `router` | llama-3.3-70b-instruct:free | **Free** | `router.sh` |
-| Nina | `nim` | llama-3.3-70b-instruct | **Free** | `nim.sh` |
-| Mira | `mistral` | mistral-small-latest | **Free** | `mistral.sh` |
-| Gabby | `github` | gpt-4o-mini | **Free** | `github.sh` |
-| Derek | `derek` | deepseek-v4-flash | Paid | `derek.sh` |
+| **Derek** ⭐ | `derek` | deepseek-v4-flash | Paid | `derek.sh` |
+| **Peter** | `peter` | deepseek-v4-pro | Paid | `peter.sh` |
+| Greg | `greg` | gemini-3.1-flash-lite | Paid | `greg.sh` — use only when web search is required |
 | Owen | `owen` | gpt-4o-mini | Paid | `owen.sh` |
 | Kevin | — | Claude Sonnet/Opus | Paid | `Agent` tool |
 
 ### Shell invocation
 
 ```bash
-# Greg (Gemini) — default, free, has web search
+# Derek (DeepSeek v4 Flash) — default choice; has OpenAISearch built in
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/derek.sh --dangerously-skip-permissions
+
+# Peter (DeepSeek v4 Pro) — higher capability, same API
+echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/peter.sh --dangerously-skip-permissions
+
+# Greg (Gemini) — use only when web search is required; Gemini tokens are expensive. Prefer Derek.
 echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/greg.sh --dangerously-skip-permissions
 
-# Free provider alternatives
-echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/groq.sh --dangerously-skip-permissions
-echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/router.sh --dangerously-skip-permissions
-echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/nim.sh --dangerously-skip-permissions
-echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/mistral.sh --dangerously-skip-permissions
-echo "your prompt" | bash <OPENCLAUDE_PATH>/bin/github.sh --dangerously-skip-permissions
 ```
 
 **Default to `--dangerously-skip-permissions` unless the task is purely text-in/text-out.** Without it, any bash call stalls waiting for interactive approval.
 
 > **Root environment note:** The openclaude CLI blocks `--dangerously-skip-permissions` when `uid == 0` unless `IS_SANDBOX=1` is set. All `.sh` launchers handle this automatically.
 
-### ProviderAgent tool (use from inside OpenClaude)
-
-```
-Use the ProviderAgent tool with provider="groq" (or greg/derek/owen/router/nim/mistral/github)
-to route a self-contained task to that provider without leaving the session.
-```
-
-Run multiple `ProviderAgent` calls in parallel to fan out work across free providers simultaneously.
 
 ### Kevin invocation
 
 From within a Claude Code session, use the `Agent` tool — it spawns a fresh Claude instance with full tool access.
 
-### Forge — autonomous orchestrator
-
-```bash
-bash <OPENCLAUDE_PATH>/bin/forge.sh   # start autonomous orchestrator session
-```
-
-Forge uses Greg as the orchestrator brain, dispatches coding subtasks to free providers via `ProviderAgent`, self-heals on rate limits (rotating groq → router → nim → mistral → github → greg), and iterates until tasks are complete. Use `/forge <task>` inside a Forge session.
 
 ### Shared rules for all subagent prompts
 - Include the working directory explicitly (e.g. `Your working directory is /absolute/path.`)
@@ -95,15 +76,19 @@ Forge uses Greg as the orchestrator brain, dispatches coding subtasks to free pr
 If you were spawned by the `SubAgent` or `ProviderAgent` tool (running non-interactively via `-p`):
 - Do NOT use `SubAgent` or `ProviderAgent` — recursive spawning creates infinite loops
 - Use your built-in tools directly: `Bash`, `Read`, `Edit`, `Write`
-- Greg has native Gemini web search — use `GeminiSearch` directly, no delegation needed
+- Derek has `OpenAISearch` built in — use it directly for web lookups (cheap, no Gemini cost)
+- Greg has `GeminiSearch` built in — use only when web search is required; Gemini tokens are expensive
 
 Source: `<OPENCLAUDE_PATH>/src/tools/OpenClaudeTool/OpenClaudeTool.ts`, `<OPENCLAUDE_PATH>/src/tools/ProviderAgentTool/ProviderAgentTool.ts`
 
 ## Web Search
 
-Use the `GeminiSearch` tool — it calls the Gemini API directly with Google Search grounding and returns a synthesized answer with source citations. It is enabled whenever `GEMINI_API_KEY` is set (i.e. always in this environment).
+Two search tools are available depending on which provider is active:
 
-Do **not** spawn a Greg subagent just to do a web search — Greg itself uses `GeminiSearch` as a built-in tool.
+- **`OpenAISearch`** — calls OpenAI's Responses API (`/v1/responses`) with `web_search_preview` on `gpt-5.4-nano`. Enabled when `OPENAI_SEARCH_API_KEY` (or `OPENAI_API_KEY`) and `OPENAI_SEARCH_MODEL` are set. **Use this in Derek sessions.** $10/1000 searches; retrieved web tokens are free.
+- **`GeminiSearch`** — calls Gemini with Google Search grounding. Enabled when `GEMINI_API_KEY` is set. Faster and more sources, but Gemini processing tokens are not free — avoid for large reports.
+
+Do **not** use Greg just for a web search — prefer Derek with `OpenAISearch` to keep processing costs on DeepSeek.
 
 ## Markdown to PDF
 

@@ -1,0 +1,19 @@
+{
+  "name": "openclaude-deepseek-provider",
+  "version": "1.0.0",
+  "description": "DeepSeek V4 provider + prefix-cache preservation for the pi coding agent (in-house, no third-party runtime dependency)",
+  "type": "module",
+  "main": "index.ts",
+  "author": "",
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.73.1",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

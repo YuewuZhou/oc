@@ -52,9 +52,6 @@ const result = await Bun.build({
   naming: 'cli.mjs',
   define: {
     // MACRO.* build-time constants
-    // Keep the internal compatibility version high enough to pass
-    // first-party minimum-version guards, but expose the real package
-    // version separately in Open Claude branding.
     'MACRO.VERSION': JSON.stringify('99.0.0'),
     'MACRO.DISPLAY_VERSION': JSON.stringify(version),
     'MACRO.BUILD_TIME': JSON.stringify(new Date().toISOString()),
@@ -62,6 +59,11 @@ const result = await Bun.build({
       JSON.stringify('report the issue at https://github.com/anthropics/claude-code/issues'),
     'MACRO.PACKAGE_URL': JSON.stringify('@gitlawb/openclaude'),
     'MACRO.NATIVE_PACKAGE_URL': 'undefined',
+
+    // Inline process.env.USER_TYPE so Bun can DCE ant-only code paths
+    // (gated by process.env.USER_TYPE === 'ant') that contain require()
+    // calls to modules not present in the open build.
+    'process.env.USER_TYPE': JSON.stringify('external'),
   },
   plugins: [
     {
@@ -100,18 +102,34 @@ export async function handleBgFlag() { throw new Error("Background sessions are 
           ],
         ] as const)
 
-        // Resolve `import { feature } from 'bun:bundle'` to a shim
-        build.onResolve({ filter: /^bun:bundle$/ }, () => ({
-          path: 'bun:bundle',
-          namespace: 'bun-bundle-shim',
-        }))
-        build.onLoad(
-          { filter: /.*/, namespace: 'bun-bundle-shim' },
-          () => ({
-            contents: `const FLAGS = ${JSON.stringify(featureFlags)};\nexport function feature(name) { return FLAGS[name] === true; }`,
-            loader: 'js',
-          }),
-        )
+        // Inline feature() calls before Bun processes the file.
+        // Bun's native bun:bundle handler defaults all flags to false and
+        // ignores onResolve/onLoad plugins for bun:bundle. By replacing
+        // feature('FLAG') with the literal boolean here, we get correct
+        // values AND Bun can still eliminate dead require() branches.
+        // Flags not in the map are left as-is (they resolve to undefined
+        // which is falsy — same semantics as the original bun:bundle macro).
+        const flagEntries = Object.entries(featureFlags)
+        if (flagEntries.length > 0) {
+          const featureCallPattern = new RegExp(
+            `feature\\(['"](${flagEntries.map(([k]) => k).join('|')})['"]\\)`,
+            'g',
+          )
+          build.onLoad({ filter: /\.(ts|tsx)$/ }, async (args) => {
+            // Skip node_modules to keep the plugin fast
+            if (args.path.includes('node_modules')) return undefined
+            const source = await Bun.file(args.path).text()
+            if (!source.includes('feature(')) return undefined
+            const flagValueMap = Object.fromEntries(flagEntries)
+            const replaced = source.replace(featureCallPattern, (_, name: string) => {
+              const value = flagValueMap[name] ?? false
+              return String(value)
+            })
+            // Only return if we actually changed something
+            if (replaced === source) return undefined
+            return { contents: replaced, loader: 'tsx' }
+          })
+        }
 
         build.onResolve(
           { filter: /^\.\.\/(daemon\/workerRegistry|daemon\/main|cli\/bg|cli\/handlers\/templateJobs|environment-runner\/main|self-hosted-runner\/main)\.js$/ },

@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
-# Greg — Gemini subagent launcher.
+# Peter — DeepSeek V4 Pro subagent launcher.
 #
-# Usage: echo "prompt" | bash /path/to/openclaude/bin/greg.sh [--dangerously-skip-permissions]
+# Usage: echo "prompt" | bash /path/to/openclaude/bin/peter.sh [--dangerously-skip-permissions]
 
 SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 CLI="$SCRIPT_DIR/../dist/cli.mjs"
 PROMPT=$(cat)
 
 # ── Recursion guard ───────────────────────────────────────────────────────────
-# Prevent runaway recursion: any Derek/Greg that tries to spawn another one fails
-# immediately at the shell level — before spending any API budget.
 if [[ "${OPENCLAUDE_DEPTH:-0}" -gt 0 ]]; then
-    echo "ERROR: greg.sh cannot be invoked from within a Derek or Greg subagent (OPENCLAUDE_DEPTH=${OPENCLAUDE_DEPTH}). Perform research directly using your built-in tools — do NOT invoke any skills or subagents." >&2
+    echo "ERROR: peter.sh cannot be invoked from within a Derek or Greg subagent (OPENCLAUDE_DEPTH=${OPENCLAUDE_DEPTH}). Perform research directly using your built-in tools — do NOT invoke any skills or subagents." >&2
     exit 1
 fi
 export OPENCLAUDE_DEPTH=1
@@ -36,10 +34,12 @@ if [[ -f "$SCRIPT_DIR/../.env" ]]; then
 fi
 
 echo "$PROMPT" | env \
-    CLAUDE_CODE_USE_GEMINI=1 \
-    GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-flash-lite}" \
-    OPENAI_API_KEY="$GEMINI_API_KEY" \
-    OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai \
-    NODE_OPTIONS="--max-old-space-size=1024 ${NODE_OPTIONS:-}" \
+    CLAUDE_CODE_USE_OPENAI=1 \
+    CLAUDE_CODE_USE_GEMINI= \
+    GEMINI_MODEL= \
+    OPENAI_MODEL="${DEEPSEEK_PRO_MODEL:-deepseek-v4-pro}" \
+    OPENAI_API_KEY="$DEEPSEEK_API_KEY" \
+    OPENAI_BASE_URL=https://api.deepseek.com/v1 \
+    OPENAI_SEARCH_API_KEY="${OPENAI_API_KEY}" \
     CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 \
     node "$CLI" -p --dangerously-skip-permissions "$@"

@@ -10,7 +10,7 @@ services:
       - INSTANCE_NAME=OpenClaude Search
       - SEARXNG_SECRET=opensearch-secret
     healthcheck:
-      test: [CMD, wget, -qO-, http://localhost:8080/search?q=test&format=json]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/search?q=test&format=json"]
       interval: 30s
       timeout: 10s
       retries: 3

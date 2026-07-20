@@ -1,0 +1,19 @@
+{
+  "name": "openclaude-websearch-provider",
+  "version": "1.0.0",
+  "description": "Free web_search tool for pi backed by self-hosted SearXNG, instead of a paid search API",
+  "type": "module",
+  "main": "index.ts",
+  "author": "",
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.73.1",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

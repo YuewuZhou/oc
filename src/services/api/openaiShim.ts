@@ -76,6 +76,18 @@ function convertSystemPrompt(
   return String(system)
 }
 
+function stripImagesFromMessages(messages: OpenAIMessage[]): OpenAIMessage[] {
+  return messages.map(msg => {
+    if (!Array.isArray(msg.content)) return msg
+    const filtered = msg.content.filter(
+      (part: { type?: string }) => part.type !== 'image_url',
+    )
+    return { ...msg, content: filtered.length === 1 && filtered[0]?.type === 'text'
+      ? (filtered[0] as { text?: string }).text ?? ''
+      : filtered }
+  })
+}
+
 function convertContentBlocks(
   content: unknown,
 ): string | Array<{ type: string; text?: string; image_url?: { url: string } }> {
@@ -665,7 +677,7 @@ class OpenAIShimMessages {
     params: ShimCreateParams,
     options?: { signal?: AbortSignal; headers?: Record<string, string> },
   ): Promise<Response> {
-    const openaiMessages = convertMessages(
+    let openaiMessages = convertMessages(
       params.messages as Array<{
         role: string
         message?: { role?: string; content?: unknown }
@@ -673,6 +685,11 @@ class OpenAIShimMessages {
       }>,
       params.system,
     )
+
+    // DeepSeek models don't support vision — strip image_url blocks
+    if (request.baseUrl.includes('deepseek') || request.resolvedModel.includes('deepseek')) {
+      openaiMessages = stripImagesFromMessages(openaiMessages)
+    }
 
     const body: Record<string, unknown> = {
       model: request.resolvedModel,

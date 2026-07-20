@@ -87,7 +87,7 @@ export const GeminiSearchTool = buildTool({
     return `Search the web using Gemini's native Google Search grounding.
 - Returns a synthesized answer with real source citations
 - Use for current events, recent docs, and factual queries
-- Always include the Sources section in your response using markdown hyperlinks`
+- Only cite sources when the user asks you to — otherwise just the answer saves tokens`
   },
 
   get inputSchema(): InputSchema {
@@ -115,16 +115,14 @@ export const GeminiSearchTool = buildTool({
   },
 
   mapToolResultToToolResultBlockParam({ answer, sources }, toolUseID) {
-    let content = answer
-    if (sources.length > 0) {
-      content +=
-        '\n\nSources:\n' + sources.map(s => `- [${s.title}](${s.uri})`).join('\n')
-    }
-    content += '\n\nREMINDER: Include the sources above in your response as markdown hyperlinks.'
+    // Terse: answer text + compact source list. Gemini URIs are giant
+    // Google redirect URLs, so just use the title (domain name) if available.
     return {
       tool_use_id: toolUseID,
       type: 'tool_result' as const,
-      content,
+      content: sources.length
+        ? answer + '\n\n' + sources.map(s => s.title || s.uri).join('\n')
+        : answer,
     }
   },
 

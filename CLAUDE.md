@@ -96,12 +96,55 @@ Source: `tools/puppeteer/snapshot.mjs`. The `snapshot` shell wrapper `cd`s to th
 
 ## Web Search
 
-Web search is provided by two tools:
+Web search is provided by three tools:
 
-- **`GeminiSearch`** (`src/tools/GeminiSearchTool/GeminiSearchTool.ts`) — direct `fetch()` to `generativelanguage.googleapis.com` with `tools: [{google_search: {}}]`. Returns a grounded answer + source citations. Enabled when `GEMINI_API_KEY` is set. This is what Greg uses.
+- **`OpenAISearch`** (`src/tools/OpenAISearchTool/OpenAISearchTool.ts`) — calls OpenAI's Responses API (`/v1/responses`) with `web_search_preview`. Enabled when `OPENAI_SEARCH_API_KEY` (or `OPENAI_API_KEY`) and `OPENAI_SEARCH_MODEL` are set. Derek has this built in. $10/1000 searches; retrieved web tokens are free. Use `gpt-5.4-nano` for cheapest results.
+- **`GeminiSearch`** (`src/tools/GeminiSearchTool/GeminiSearchTool.ts`) — calls Gemini with Google Search grounding. Returns a grounded answer + source citations. Enabled when `GEMINI_API_KEY` is set. Greg uses this. Faster and more sources than OpenAI search; Gemini processing tokens are not free.
 - **`WebSearch`** (`src/tools/WebSearchTool/`) — Anthropic-first-party only (uses the `web_search_20250305` beta). Enabled for `firstParty`, Vertex, and Foundry providers only.
 
-In-process search backends (DDG, Brave, SearXNG) have been removed. `src/services/search/` is a stub that returns `[]`.
+In-process search backends (DDG, Brave, SearXNG) have been removed from openclaude itself. `src/services/search/` is a stub that returns `[]`. SearXNG has since been revived as a dependency of the standalone **pi** setup below — it is not wired back into openclaude's own tools.
+
+## Pi Coding Agent
+
+[Pi](https://pi.dev) (`earendil-works/pi` upstream, published to npm as **`@mariozechner/pi-coding-agent`** — the GitHub org and npm scope don't match, don't go looking for docs under the wrong name) is a separate, minimal, extensible terminal coding agent, installed globally (`bun add -g --ignore-scripts @mariozechner/pi-coding-agent`) alongside openclaude. It is not part of the openclaude CLI — it's an independent tool that happens to share this machine and its `.env` secrets.
+
+### Layout
+
+```
+~/.pi/agent/
+  settings.json   # defaultProvider/Model, extensions list
+  auth.json       # DeepSeek key, resolved via shell command (see below) — 0600
+openclaude/
+  docker-compose.searxng.yml   # SearXNG backend for pi's web_search tool
+  tools/pi/
+    deepseek-provider/     # registers DeepSeek V4 Pro/Flash + prefix-cache preservation
+    websearch-provider/    # web_search tool, backed by local SearXNG, with auto-start
+    pi-1shot.mjs            # bounded one-shot RPC runner (the loop guard)
+  bin/pi-1shot.sh            # launcher: sources .env, calls pi-1shot.mjs
+```
+
+### Auth
+
+DeepSeek's key is **not** read from ambient shell env — `~/.pi/agent/auth.json` resolves it fresh from `openclaude/.env` on every pi startup via a shell-command key (`"!grep ... openclaude/.env"`), per pi's documented `auth.json` key-resolution order (CLI flag → auth.json → env var). This means bare `pi`, run from any shell, authenticates correctly without needing `.env` sourced first. If you ever see `401 ... invalid` from a bare `pi` invocation, check that `openclaude/.env`'s `DEEPSEEK_API_KEY` line is still intact — that's the only thing `auth.json` depends on.
+
+### Extensions (in-house, not the third-party `pi-deepseek-provider` package)
+
+- **`deepseek-provider`** — registers `deepseek-v4-flash`/`deepseek-v4-pro` with real pricing/context, and reimplements the two highest-value optimizations from the community `monotykamary/pi-deepseek-provider` extension (evaluated but not installed — it's a single-maintainer, near-zero-adoption repo, not worth the tool-access trust for a 0.73.1-target rewrite instead): tool-schema canonicalization (keeps DeepSeek's prefix cache from being busted by incidental key reordering) and compaction gating (defers/pauses auto-compaction, since rewriting history is the single biggest cache-killer). Also strips old `thinking` content on replay to cut uncached prompt bloat. Note: this pi version's thinking levels are `minimal/low/medium/high/xhigh`, not the `max` the community repo assumed — `xhigh` is mapped to DeepSeek's `reasoning_effort: "max"`.
+- **`websearch-provider`** — registers a `web_search` tool that queries the local SearXNG instance directly (`fetch()` + JSON, no API cost). If SearXNG is unreachable, it auto-runs `docker compose -f docker-compose.searxng.yml up -d` and polls until healthy (up to 60s) before retrying the search once. The tool's `promptGuidelines` tell the model this delay is normal so it doesn't treat it as a failure. Configurable via `SEARXNG_URL` / `SEARXNG_COMPOSE_FILE` env vars.
+
+### Loop guard
+
+Pi has **no built-in max-turns or iteration cap** (confirmed against its own settings docs — only retry/timeout knobs exist). `bin/pi-1shot.sh` wraps pi's `--mode rpc` JSONL protocol, counts `turn_start` events, and force-aborts (RPC `abort` → SIGTERM → SIGKILL after a 5s grace period) on either a turn cap or wall-clock timeout — same settled-guard shape as the `SubAgent` tool above.
+
+```bash
+bash bin/pi-1shot.sh "your prompt" --max-turns 40 --timeout-ms 900000 --cwd /path/to/project
+```
+
+Exit codes: `0` clean completion, `1` turn cap hit, `2` timeout hit, `3` spawn/usage error.
+
+### SearXNG
+
+`docker-compose.searxng.yml` had a latent bug (unquoted `&` in the healthcheck URL breaks YAML flow-sequence parsing) — fixed. Bring it up manually with `docker compose -f docker-compose.searxng.yml up -d`; the `websearch-provider` extension does this automatically on demand.
 
 ## Important repo notes
 
@@ -150,7 +193,7 @@ Edit `~/openclaude/.env` and fill in your API keys. That's it — `~/CLAUDE.md` 
 
 | Name | Model | Tier | Invoke |
 |------|-------|------|--------|
-| Greg | gemini-2.5-flash-lite (Gemini) | Free | `echo "prompt" \| bash ~/openclaude/bin/greg.sh [--dangerously-skip-permissions]` |
+| Greg | gemini-3.1-flash-lite (Gemini) | Paid | `echo "prompt" \| bash ~/openclaude/bin/greg.sh [--dangerously-skip-permissions]` |
 | Derek | deepseek-v4-flash (DeepSeek) | Paid | `echo "prompt" \| bash ~/openclaude/bin/derek.sh [--dangerously-skip-permissions]` |
 | Owen | gpt-4o-mini (OpenAI) | Paid | `echo "prompt" \| bash ~/openclaude/bin/owen.sh [--dangerously-skip-permissions]` |
 | Greta | llama-3.3-70b-versatile (Groq) | **Free** | `echo "prompt" \| bash ~/openclaude/bin/groq.sh [--dangerously-skip-permissions]` |

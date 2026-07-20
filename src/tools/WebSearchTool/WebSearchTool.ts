@@ -173,7 +173,12 @@ export const WebSearchTool = buildTool({
     return summary ? `Searching for ${summary}` : 'Searching the web'
   },
   isEnabled() {
-    if (process.env.CLAUDE_CODE_USE_OPENAI) return !!process.env.OPENAI_SEARCH_MODEL
+    // Only enable for OpenAI when the model is a search-preview variant.
+    // Non-preview models use OpenAISearchTool (Responses API) instead.
+    if (process.env.CLAUDE_CODE_USE_OPENAI) {
+      const m = process.env.OPENAI_SEARCH_MODEL ?? ''
+      return !!m && /search-preview/.test(m)
+    }
 
     const provider = getAPIProvider()
     const model = getMainLoopModel()

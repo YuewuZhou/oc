@@ -1300,7 +1300,9 @@ export function getAutoModeUnavailableReason(): AutoModeUnavailableReason | null
  */
 export type AutoModeEnabledState = 'enabled' | 'disabled' | 'opt-in'
 
-const AUTO_MODE_ENABLED_DEFAULT: AutoModeEnabledState = 'disabled'
+// openclaude: default to 'enabled' since GrowthBook is unavailable in the open build.
+// Upstream defaults to 'disabled' and relies on GrowthBook to enable; we skip that gate.
+const AUTO_MODE_ENABLED_DEFAULT: AutoModeEnabledState = 'enabled'
 
 function parseAutoModeEnabledState(value: unknown): AutoModeEnabledState {
   if (value === 'enabled' || value === 'disabled' || value === 'opt-in') {
